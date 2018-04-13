@@ -36,6 +36,9 @@
   </div>
   <button id='power-off'>Power Off</button>
 
+  <!--
+    handles the functionality when the user submits the form
+  -->
   <script type='text/javascript'>
     var form = document.getElementById('form');
     if (form) {
@@ -48,8 +51,12 @@
       };
     }
   </script>
+
+  <!--
+    handles the functionality when the user selects the power off button
+  -->
   <script type='text/javascript'>
-    var power_off = document.getElementById('display-info');
+    var power_off = document.getElementById('power-off');
     if (power_off) {
       power_off.onclick = (event) => {
         event.preventDefault();
@@ -58,6 +65,9 @@
     }
   </script>
 
+  <!--
+    handles the functionality of when the user selects the system information button
+  -->
   <script type='text/javascript'>
     var display = document.getElementById('display-info');
     var system_info = document.getElementById('system-info');
@@ -74,6 +84,9 @@
     }
   </script>
 
+  <!--
+    handles the functionality when user selects the refresh button
+  -->
   <script type='text/javascript'>
     var refresh = document.getElementById('system-info-refresh');
     if (refresh) {
