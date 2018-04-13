@@ -32,6 +32,7 @@
   <button id='display-info'>Display System Information</button>
   <div class='hidden' id='system-info'>
     <p>System information</p>
+    <button id='system-info-refresh'>Refresh</button>
   </div>
   <button id='power-off'>Power Off</button>
 
@@ -69,6 +70,16 @@
         } else {
           system_info.className = 'hidden';
         }
+      };
+    }
+  </script>
+
+  <script type='text/javascript'>
+    var refresh = document.getElementById('system-info-refresh');
+    if (refresh) {
+      refresh.onclick = (event) => {
+        event.preventDefault();
+        console.log('refreshing system info');
       };
     }
   </script>
