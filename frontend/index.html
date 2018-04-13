@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='UTF-8'>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+    }
+    .hidden {
+      display: none;
+    }
+
+    .visible {
+      display: inline-block;
+    }
+  </style>
+
+</head>
+
+<body>
+  <form id='form' method='POST'>
+    <label>Set Speed</label>
+    <input id='speed' name='speed'>
+    <label>Set Safe Distance</label>
+    <input id='distance' name='distance'>
+    <input type='submit'>
+  </form>
+  <button id='display-info'>Display System Information</button>
+  <div class='hidden' id='system-info'>
+    <p>System information</p>
+  </div>
+  <button id='power-off'>Power Off</button>
+
+  <script type='text/javascript'>
+    var form = document.getElementById('form');
+    if (form) {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        var speed = document.getElementById('speed').value;
+        var distance = document.getElementById('distance').value;
+        console.log('speed: ', speed);
+        console.log('distance: ', distance)
+      };
+    }
+  </script>
+  <script type='text/javascript'>
+    var power_off = document.getElementById('power-off');
+    if (power_off) {
+      power_off.onclick = (event) => {
+        event.preventDefault();
+        console.log('attempting to power off');
+      };
+    }
+  </script>
+  <script type='text/javascript'>
+    var power_off = document.getElementById('display-info');
+    if (power_off) {
+      power_off.onclick = (event) => {
+        event.preventDefault();
+        console.log('attempting to power off');
+      };
+    }
+  </script>
+
+  <script type='text/javascript'>
+    var display = document.getElementById('display-info');
+    var system_info = document.getElementById('system-info');
+
+    if (display && system_info) {
+      display.onclick = (event) => {
+        event.preventDefault();
+        if (system_info.className === 'hidden') {
+          system_info.className = 'visible';
+        } else {
+          system_info.className = 'hidden';
+        }
+      };
+    }
+  </script>
+</body>
+
+</html>
