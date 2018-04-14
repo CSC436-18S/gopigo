@@ -18,7 +18,7 @@ def index():
     return render_template('index.html')
 
 """
-  function that handles starting the application
+  function that handles starting the application on port 8080
 """
 def run(isDebug):
-  app.run(port=8080, debug=isDebug)
+  app.run(port=8080, debug=isDebug, threaded=True)

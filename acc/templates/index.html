@@ -225,24 +225,28 @@
     sends POST request to /api/form
   -->
   <script type='text/javascript'>
-    var form = document.getElementById('form');
-    var url = 'http://localhost:8080/api/user-settings';
+    const form = document.getElementById('form');
+    const url = 'http://localhost:8080/api/user-settings';
     form.onsubmit = (event) => {
       event.preventDefault();
-      var formSpeed = document.getElementById('speed').value;
-      var formDistance = document.getElementById('distance').value;
-      var modal = document.getElementById('submitModal');
-      var message = document.getElementById('submitModalMessage');
+      const formSpeed = document.getElementById('speed').value;
+      const formDistance = document.getElementById('distance').value;
+      const modal = document.getElementById('submitModal');
+      const message = document.getElementById('submitModalMessage');
 
       message.innerHTML = '';
 
       if (formSpeed.length !== 0 && formDistance.length !== 0) {
-        var numSpeed = parseInt(formSpeed);
-        var numDistance = parseInt(formDistance);
-        var form_data = {
+        const numSpeed = parseInt(formSpeed);
+        const numDistance = parseInt(formDistance);
+        const form_data = {
           "speed": numSpeed,
           "distance": numDistance
         }
+
+        /**
+          send user settings to api
+         */
         fetch(url, {
           method: 'POST',
           headers: {
@@ -266,15 +270,19 @@
     handles the functionality when the user selects the power off button
   -->
   <script type='text/javascript'>
-    var power_switch = document.getElementById('powerSwitch');
+    const power_switch = document.getElementById('powerSwitch');
     power_switch.onclick = (event) => {
       event.preventDefault();
-      var url = 'http://localhost:8080/api/power-status';
-      var modal = document.getElementById('powerSwitchModal');
-      var message = document.getElementById('powerSwitchModalMessage');
+      const url = 'http://localhost:8080/api/power-status';
+      const modal = document.getElementById('powerSwitchModal');
+      const message = document.getElementById('powerSwitchModalMessage');
 
       message.innerHTML = '';
 
+      /**
+        fetch the current power setting and negate, then post
+        to the api
+      */
       fetch(url, {
         method: 'GET',
         headers: {
@@ -283,7 +291,7 @@
       })
         .then(res => res.json())
         .then(json => {
-          var data = {
+          const data = {
             'power': !json.power
           };
           return fetch(url, {
@@ -320,13 +328,16 @@
     handles the functionality of when the user selects the system information button
   -->
   <script type='text/javascript'>
-    var display = document.getElementById('display-info');
-    var system_info = document.getElementById('system-info');
+    const display = document.getElementById('display-info');
+    const system_info = document.getElementById('system-info');
     display.onclick = (event) => {
       event.preventDefault();
       if (system_info.className === 'hidden') {
-        var url = 'http://localhost:8080/api/user-settings';
-        var xhr = new XMLHttpRequest();
+        const url = 'http://localhost:8080/api/user-settings';
+
+        /**
+          fetch the current user settings
+         */
         fetch(url, {
           method: 'GET',
           headers: {
@@ -335,11 +346,16 @@
         })
           .then(res => res.json())
           .then(json => {
-            var display = document.getElementById('display-info-content');
+            const display = document.getElementById('display-info-content');
             display.innerHTML = '';
+
+            /**
+              go through KV pairs, create div for each,
+              and append to display information div
+             */
             for (key in json) {
               if (json.hasOwnProperty(key)) {
-                var div = document.createElement('div');
+                const div = document.createElement('div');
                 div.innerHTML = key + ": " + json[key];
                 display.appendChild(div);
               }
@@ -355,20 +371,26 @@
     };
   </script>
 
+  <!--
+    handles when the user presses the submit modal close button
+  -->
   <script>
-    var closeSubmit = document.getElementById('submitModalClose');
+    const closeSubmit = document.getElementById('submitModalClose');
     closeSubmit.onclick = (event) => {
       event.preventDefault();
-      var modal = document.getElementById('submitModal');
+      const modal = document.getElementById('submitModal');
       modal.style.display = 'none';
     }
   </script>
 
+  <!--
+    handles when the user presses the power modal close button
+  -->
   <script>
-    var closePowerOff = document.getElementById('powerSwitchModalClose');
+    const closePowerOff = document.getElementById('powerSwitchModalClose');
     closePowerOff.onclick = (event) => {
       event.preventDefault();
-      var modal = document.getElementById('powerSwitchModal');
+      const modal = document.getElementById('powerSwitchModal');
       modal.style.display = 'none';
     }
   </script>
