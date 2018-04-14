@@ -13,7 +13,10 @@ import json
 api = Api(app)
 
 """
-  default values for needed variables for application
+  default values for needed variables for application,
+  speed 0 so not moving, distance 9999 because this is
+  technically safeDistance, power False because we don't
+  want to start the rover immediately after the application
 """
 speed = 0
 distance = 9999
@@ -21,6 +24,7 @@ power = False
 
 """
   handles getting the user settings
+  by returing the user settings jsonified
 """
 @app.route('/api/user-settings', methods=['GET'])
 def get_settings():
@@ -32,7 +36,10 @@ def get_settings():
   return res
 
 """
-  handles POST request of user settings from fetch
+  handles POST request of user settings from fetch,
+  and returns the render_template index.html
+  because we do not need immediate access to the data
+  after the POST request
 """
 @app.route('/api/user-settings', methods=['POST'])
 def post_settings():
@@ -46,7 +53,8 @@ def post_settings():
   return render_template('index.html')
 
 """
-  handles GET request for the power status
+  handles GET request for the power status,
+  by returing the power status jsonified
 """
 @app.route('/api/power-status', methods=['GET'])
 def get_power():
@@ -58,7 +66,10 @@ def get_power():
   return res
 
 """
-  handles POST request for setting the power from fetch
+  handles POST request for setting the power from fetch,
+  since the fetch needs the value of the power status
+  after setting it, we return the power status,
+  and not the render template
 """
 @app.route('/api/power-status', methods=['POST'])
 def post_power():
