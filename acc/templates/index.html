@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='UTF-8'>
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+  <style>
+    .modal {
+      display: none;
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      z-index: 99;
+      position: fixed;
+      overflow: auto;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: #fefefe;
+      border: 1px solid #888;
+      width: 300px;
+      padding: 30px;
+    }
+
+    body {
+      background: #f1f3f5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-family: 'Roboto', sans-serif
+    }
+
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .power-off {
+      background: #f44336;
+    }
+
+    .power-off:hover {
+      background: #ab1409;
+    }
+
+
+    .power-on {
+      background: #009900;
+    }
+
+    .power-on:hover {
+      background: #006b00;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .visible {
+      display: inline-block;
+    }
+
+    #form-wrapper {
+      display: flex;
+    }
+
+    .page {
+      margin: 0 auto;
+    }
+
+    .page-container {
+      margin-top: 40px;
+      margin-right: auto;
+      margin-bottom: 0;
+      margin-left: auto;
+      display: flex;
+      max-width: 1080px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    .page-content {
+      min-width: 480px;
+    }
+
+    form {
+      padding: 20px;
+      width: 100%;
+      background: #ffffff;
+      box-sizing: border-box;
+    }
+
+    .form-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-section+.form-section {
+      margin-top: 18px;
+    }
+
+    .form-section input[type=number] {
+      outline: none;
+      display: block;
+      background: rgba(0, 0, 0, 0.1);
+      width: 100%;
+      border: 0;
+      border-radius: 4px;
+      box-sizing: border-box;
+      padding: 12px 20px;
+      color: rgba(0, 0, 0, 0.6);
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: 500;
+      line-height: inherit;
+      transition: 0.3s ease;
+    }
+
+    .form-section input[type=submit] {
+      width: 100%;
+    }
+
+    button,
+    .form-section input[type=submit] {
+      margin-top: 10px;
+      outline: none;
+      background: #4285F4;
+      border: 0;
+      border-radius: 4px;
+      padding: 12px 20px;
+      color: #FFFFFF;
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: 500;
+      line-height: inherit;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .system-content {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .system-content-item {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    #system-info {
+      position: relative;
+    }
+
+    .close {
+      cursor: pointer;
+      color: #aaaaaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    input[type=submit]:hover,
+    button:hover {
+      background: #0b4bb6;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id='submitModal' class='modal'>
+    <div class="modal-content">
+      <span id='submitModalClose' class="close">&times;</span>
+      <p id='submitModalMessage'>Some text in the Modal..</p>
+    </div>
+  </div>
+  <div id='powerSwitchModal' class='modal'>
+    <div class="modal-content">
+      <span id='powerSwitchModalClose' class="close">&times;</span>
+      <p id='powerSwitchModalMessage'>Some text in the Modal..</p>
+    </div>
+  </div>
+  <div class='page'>
+    <div class='page-container'>
+      <div class='page-content'>
+        <form enctype='application/json' id='form' method='POST'>
+          <div class='form-section'>
+            <label for='speed'>SPEED</label>
+            <input type='number' id='speed' name='speed'>
+          </div>
+          <div class='form-section'>
+            <label for='distance'>SAFE DISTANCE</label>
+            <input type='number' id='distance' name='distance'>
+          </div>
+          <div class='form-section'>
+            <input type='submit' value='SUBMIT'>
+          </div>
+        </form>
+        <div class='system-content'>
+          <div class='system-content-item'>
+            <button id='display-info'>Display System Information</button>
+            <div class='hidden' id='system-info'>
+              <p>System information</p>
+              <div id='display-info-content'></div>
+            </div>
+          </div>
+          <div class='system-content-item'>
+            <button class='power-on' id='powerSwitch'>Power On</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--
+    handles the functionality when the user submits the form
+    sends POST request to /api/form
+  -->
+  <script type='text/javascript'>
+    var form = document.getElementById('form');
+    var url = 'http://localhost:8080/api/user-settings';
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      var formSpeed = document.getElementById('speed').value;
+      var formDistance = document.getElementById('distance').value;
+      var modal = document.getElementById('submitModal');
+      var message = document.getElementById('submitModalMessage');
+
+      message.innerHTML = '';
+
+      if (formSpeed.length !== 0 && formDistance.length !== 0) {
+        var numSpeed = parseInt(formSpeed);
+        var numDistance = parseInt(formDistance);
+        var form_data = {
+          "speed": numSpeed,
+          "distance": numDistance
+        }
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(form_data)
+        }).then(res => {
+          message.innerHTML = 'Settings have been sent to GoPiGo'
+          modal.style.display = 'flex';
+        })
+      } else {
+        message.innerHTML = 'Settings must not be empty';
+        modal.style.display = 'flex';
+      }
+      console.log('speed: ', numSpeed);
+      console.log('distance: ', numDistance)
+    };
+  </script>
+
+  <!--
+    handles the functionality when the user selects the power off button
+  -->
+  <script type='text/javascript'>
+    var power_switch = document.getElementById('powerSwitch');
+    power_switch.onclick = (event) => {
+      event.preventDefault();
+      var url = 'http://localhost:8080/api/power-status';
+      var modal = document.getElementById('powerSwitchModal');
+      var message = document.getElementById('powerSwitchModalMessage');
+
+      message.innerHTML = '';
+
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
+        .then(res => res.json())
+        .then(json => {
+          var data = {
+            'power': !json.power
+          };
+          return fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+          })
+            .then(res => res.json())
+            .then(power => {
+              if (power) {
+                if (power_switch.className === 'power-on') {
+                  power_switch.className = 'power-off';
+                  power_switch.innerHTML = 'Power Off';
+                }
+              } else {
+                if (power_switch.className === 'power-off') {
+                  power_switch.className = 'power-on';
+                  power_switch.innerHTML = 'Power On';
+                }
+              }
+              message.innerHTML = 'power set to ' + (power ? 'on' : 'off');
+              modal.style.display = 'flex';
+            })
+        })
+        .catch(err => {
+          console.log('ERROR: ', err)
+        });
+    };
+  </script>
+
+  <!--
+    handles the functionality of when the user selects the system information button
+  -->
+  <script type='text/javascript'>
+    var display = document.getElementById('display-info');
+    var system_info = document.getElementById('system-info');
+    display.onclick = (event) => {
+      event.preventDefault();
+      if (system_info.className === 'hidden') {
+        var url = 'http://localhost:8080/api/user-settings';
+        var xhr = new XMLHttpRequest();
+        fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+          .then(res => res.json())
+          .then(json => {
+            var display = document.getElementById('display-info-content');
+            display.innerHTML = '';
+            for (key in json) {
+              if (json.hasOwnProperty(key)) {
+                var div = document.createElement('div');
+                div.innerHTML = key + ": " + json[key];
+                display.appendChild(div);
+              }
+            }
+            system_info.className = 'visible';
+          })
+          .catch(err => {
+            console.log(err);
+          });
+      } else {
+        system_info.className = 'hidden';
+      }
+    };
+  </script>
+
+  <script>
+    var closeSubmit = document.getElementById('submitModalClose');
+    closeSubmit.onclick = (event) => {
+      event.preventDefault();
+      var modal = document.getElementById('submitModal');
+      modal.style.display = 'none';
+    }
+  </script>
+
+  <script>
+    var closePowerOff = document.getElementById('powerSwitchModalClose');
+    closePowerOff.onclick = (event) => {
+      event.preventDefault();
+      var modal = document.getElementById('powerSwitchModal');
+      modal.style.display = 'none';
+    }
+  </script>
+</body>
+
+</html>
