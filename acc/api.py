@@ -2,22 +2,18 @@
 This is the module of the program that contains all of the functions related to
 the webserver that hosts the user interface for the ACC.
 """
-from flask import request, render_template, jsonify
+from flask import Flask, render_template, request, render_template, jsonify
 from flask_restful import Api, Resource
-import json
 from flask_cors import CORS
+import json
+
 
 """
-  import Flask appication instance so we can
-  convert to API
+  - create application instance of Flask
+  - create an API instance of the Flask application
+  - enable CORS to so web can correctly communicate with API
 """
-from acc import app
-
-"""
-  create api instance of Flask application,
-  and enable CORS so web can correctly communicate
-  with our API
-"""
+app = Flask(__name__)
 api = Api(app)
 CORS(app)
 
@@ -30,6 +26,20 @@ CORS(app)
 speed = 0
 distance = 9999
 power = False
+
+"""
+  root path of application that renders the index.html
+  file from the templates folder
+"""
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+"""
+  function that handles starting the application on port 8080
+"""
+def run(isDebug):
+  app.run(port=8080, debug=isDebug, threaded=True)
 
 """
   handles getting the user settings

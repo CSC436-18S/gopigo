@@ -13,7 +13,7 @@ def main():
     The main function of the ACC program. It starts up the ACC and runs the
     webserver for the user interface.
     """
-    acc.run(True)
+    api.run(True)
 
 if __name__ == "__main__":
     main()
