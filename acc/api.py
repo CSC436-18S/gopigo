@@ -4,13 +4,22 @@ the webserver that hosts the user interface for the ACC.
 """
 from flask import request, render_template, jsonify
 from flask_restful import Api, Resource
-from acc import app
 import json
+from flask_cors import CORS
 
 """
-  create api instance of Flask application
+  import Flask appication instance so we can
+  convert to API
+"""
+from acc import app
+
+"""
+  create api instance of Flask application,
+  and enable CORS so web can correctly communicate
+  with our API
 """
 api = Api(app)
+CORS(app)
 
 """
   default values for needed variables for application,
