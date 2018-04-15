@@ -90,11 +90,20 @@
       min-width: 480px;
     }
 
+    #form-wrapper {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #form-wrapper,
     form {
-      padding: 20px;
       width: 100%;
       background: #ffffff;
       box-sizing: border-box;
+    }
+
+    form {
+      padding: 20px;
     }
 
     .form-section {
@@ -168,6 +177,10 @@
       font-weight: bold;
     }
 
+    #settings-status {
+      display: none;
+    }
+
     input[type=submit]:hover,
     button:hover {
       background: #0b4bb6;
@@ -183,28 +196,25 @@
       <p id='submitModalMessage'>Some text in the Modal..</p>
     </div>
   </div>
-  <div id='powerSwitchModal' class='modal'>
-    <div class="modal-content">
-      <span id='powerSwitchModalClose' class="close">&times;</span>
-      <p id='powerSwitchModalMessage'>Some text in the Modal..</p>
-    </div>
-  </div>
   <div class='page'>
     <div class='page-container'>
       <div class='page-content'>
-        <form enctype='application/json' id='form' method='POST'>
-          <div class='form-section'>
-            <label for='speed'>SPEED</label>
-            <input type='number' id='speed' name='speed'>
-          </div>
-          <div class='form-section'>
-            <label for='distance'>SAFE DISTANCE</label>
-            <input type='number' id='distance' name='distance'>
-          </div>
-          <div class='form-section'>
-            <input type='submit' value='SUBMIT'>
-          </div>
-        </form>
+        <div id='form-wrapper'>
+          <form enctype='application/json' id='form' method='POST'>
+            <div class='form-section'>
+              <label for='speed'>SPEED</label>
+              <input type='number' id='speed' name='speed'>
+            </div>
+            <div class='form-section'>
+              <label for='distance'>SAFE DISTANCE</label>
+              <input type='number' id='distance' name='distance'>
+            </div>
+            <div class='form-section'>
+              <input type='submit' value='SUBMIT'>
+            </div>
+          </form>
+          <div id='settings-status'></div>
+        </div>
         <div class='system-content'>
           <div class='system-content-item'>
             <button id='display-info'>Display System Information</button>
@@ -231,10 +241,11 @@
       event.preventDefault();
       const formSpeed = document.getElementById('speed').value;
       const formDistance = document.getElementById('distance').value;
-      const modal = document.getElementById('submitModal');
-      const message = document.getElementById('submitModalMessage');
+      const settings_status = document.getElementById('settings-status');
 
-      message.innerHTML = '';
+      settings_status.innerHTML = '';
+      settings_status.style.color = '';
+      settings_status.style.display = 'none';
 
       if (formSpeed.length !== 0 && formDistance.length !== 0) {
         const numSpeed = parseInt(formSpeed);
@@ -254,15 +265,20 @@
           },
           body: JSON.stringify(form_data)
         }).then(res => {
-          message.innerHTML = 'Settings have been sent to GoPiGo'
-          modal.style.display = 'flex';
+          settings_status.innerHTML = 'Settings have been sent to GoPiGo'
+          settings_status.style.display = 'block';
+          setTimeout(() => {
+            settings_status.style.display = 'none';
+          }, 3000);
         })
       } else {
-        message.innerHTML = 'Settings must not be empty';
-        modal.style.display = 'flex';
+        settings_status.innerHTML = 'Settings must not be empty';
+        settings_status.style.color = '#f44336';
+        settings_status.style.display = 'block';
+        setTimeout(() => {
+          settings_status.style.display = 'none';
+        }, 3000);
       }
-      console.log('speed: ', numSpeed);
-      console.log('distance: ', numDistance)
     };
   </script>
 
@@ -274,10 +290,6 @@
     power_switch.onclick = (event) => {
       event.preventDefault();
       const url = 'http://localhost:8080/api/power-status';
-      const modal = document.getElementById('powerSwitchModal');
-      const message = document.getElementById('powerSwitchModalMessage');
-
-      message.innerHTML = '';
 
       /**
         fetch the current power setting and negate, then post
@@ -314,8 +326,6 @@
                   power_switch.innerHTML = 'Power On';
                 }
               }
-              message.innerHTML = 'power set to ' + (power ? 'on' : 'off');
-              modal.style.display = 'flex';
             })
         })
         .catch(err => {
@@ -379,18 +389,6 @@
     closeSubmit.onclick = (event) => {
       event.preventDefault();
       const modal = document.getElementById('submitModal');
-      modal.style.display = 'none';
-    }
-  </script>
-
-  <!--
-    handles when the user presses the power modal close button
-  -->
-  <script>
-    const closePowerOff = document.getElementById('powerSwitchModalClose');
-    closePowerOff.onclick = (event) => {
-      event.preventDefault();
-      const modal = document.getElementById('powerSwitchModal');
       modal.style.display = 'none';
     }
   </script>
