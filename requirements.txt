@@ -1,0 +1,8 @@
+# file to install necessary applicaiton dependencies
+
+# to install the dependencies, run pip install -r requirements.txt
+# from the root level of project
+
+Flask
+flask-restful
+flask-cors
