@@ -3,6 +3,8 @@
 
 <head>
   <meta charset='UTF-8'>
+  <title>CSC346-18S GoPiGo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
       background: #f1f3f5;
@@ -12,29 +14,25 @@
     }
 
     body,
-    html {
-      margin: 0;
-      padding: 0;
-    }
-
+    html,
     p {
       margin: 0;
+      padding: 0;
     }
 
     .power-off {
       background: #f44336;
     }
 
-    .power-off:hover {
-      background: #ab1409;
-    }
-
-
     .power-on {
       background: #009900;
     }
 
-    .power-on:hover {
+    .power-off:active {
+      background: #ab1409;
+    }
+
+    .power-on:active {
       background: #006b00;
     }
 
@@ -44,10 +42,6 @@
 
     .visible {
       display: inline-block;
-    }
-
-    #form-wrapper {
-      display: flex;
     }
 
     .page {
@@ -60,30 +54,22 @@
       margin-bottom: 0;
       margin-left: auto;
       display: flex;
-      max-width: 1080px;
       align-items: center;
       justify-content: center;
       flex-direction: column;
     }
 
-    .page-content {
-      min-width: 480px;
-    }
-
-    #form-wrapper {
+    .form-wrapper {
       display: flex;
       flex-direction: column;
+      padding: 20px;
     }
 
-    #form-wrapper,
+    .form-wrapper,
     form {
       width: 100%;
       background: #ffffff;
       box-sizing: border-box;
-    }
-
-    form {
-      padding: 20px;
     }
 
     .form-section {
@@ -116,8 +102,13 @@
       width: 100%;
     }
 
+    button:active,
+    input[type=submit]:active {
+      background: #0b4bb6;
+    }
+
     button,
-    .form-section input[type=submit] {
+    input[type=submit] {
       margin-top: 10px;
       outline: none;
       background: #4285F4;
@@ -145,25 +136,45 @@
       position: relative;
     }
 
+    .system-content-item+.system-content-item {
+      margin-left: 10px;
+    }
+
     #system-info {
       position: relative;
     }
 
-    .close {
-      cursor: pointer;
-      color: #aaaaaa;
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-    }
-
     #settings-status {
       display: none;
+      margin-top: 10px;
     }
 
-    input[type=submit]:hover,
-    button:hover {
-      background: #0b4bb6;
+    @media screen and (max-width: 400px) {
+      .page-container {
+        padding: 0 10px;
+      }
+      .page-content {
+        width: 100%;
+      }
+    }
+
+    @media screen and (min-width: 750px) {
+      .system-content-item+.system-content-item {
+        margin-left: 0;
+      }
+      input[type=submit]:hover,
+      button:hover {
+        background: #0b4bb6;
+      }
+      .page-content {
+        width: 480px;
+      }
+      .power-off:hover {
+        background: #ab1409;
+      }
+      .power-on:hover {
+        background: #006b00;
+      }
     }
   </style>
 
@@ -173,7 +184,7 @@
   <div class='page'>
     <div class='page-container'>
       <div class='page-content'>
-        <div id='form-wrapper'>
+        <div class='form-wrapper'>
           <form enctype='application/json' id='form' method='POST'>
             <div class='form-section'>
               <label for='speed'>SPEED</label>
@@ -191,7 +202,7 @@
         </div>
         <div class='system-content'>
           <div class='system-content-item'>
-            <button id='display-info'>Display System Information</button>
+            <button id='display-info'>System Information</button>
             <div class='hidden' id='system-info'>
               <p>System information</p>
               <div id='display-info-content'></div>
@@ -228,20 +239,20 @@
     form.onsubmit = (event) => {
       clearTimeout(timeout);
       event.preventDefault();
-      const formSpeed = document.getElementById('speed').value;
-      const formDistance = document.getElementById('distance').value;
+      const form_speed = document.getElementById('speed').value;
+      const form_distance = document.getElementById('distance').value;
 
       settings_status.innerHTML = '';
       settings_status.style.color = '';
       settings_status.style.display = 'none';
 
 
-      if (formSpeed.length !== 0 && formDistance.length !== 0) {
-        const numSpeed = parseInt(formSpeed);
-        const numDistance = parseInt(formDistance);
+      if (form_speed.length !== 0 && form_distance.length !== 0) {
+        const num_speed = parseInt(form_speed);
+        const num_distance = parseInt(form_distance);
         const form_data = {
-          "speed": numSpeed,
-          "distance": numDistance
+          "speed": num_speed,
+          "distance": num_distance
         }
 
         /**
