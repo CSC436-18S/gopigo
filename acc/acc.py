@@ -4,7 +4,6 @@ import collections
 import time
 import traceback
 
-import smbus
 import gopigo
 
 import commands
@@ -24,6 +23,8 @@ SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
 SLOWING_DECCELLERATION = 50#100 # power units / second
 SPEED_ACCELERATION = 40#100 # power units / second
 
+BUFFER_DISTANCE = 30 # cm
+
 STOP_THRESHOLD = 0.01
 
 SAMPLE_SIZE = 10#20     # number of uss readings to sample for relative velocity
@@ -31,6 +32,183 @@ ALERT_THRESHOLD = 5.0 # 0.01
 
 USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
+
+class ACC(object):
+    def __init__(self, command_queue, user_set_speed, safe_distance):
+        """
+        Initializes the rover object and sets the values based on the given
+        parameters and the current state of the rover.
+
+        :param multiprocessing.Queue command_queue: The queue that the rover
+            will pull commands from.
+        :param float user_set_speed: The user set speed. None will cause a
+            reasonable default to be used.
+        :param int safe_distance: The user set safe distance. None will cause a
+            reasonable default to be used.
+        """
+        self.command_queue = command_queue
+
+        if user_set_speed is None:
+            pass # TODO
+        else:
+            self.user_set_speed = user_set_speed
+
+        if safe_distance is None:
+            self.safe_distance = 2 * BUFFER_DISTANCE
+        else:
+            self.safe_distance = safe_distance
+
+        self.initial_ticks_left = 0
+        self.initial_ticks_right = 0
+
+        self.dists = collections.deque(maxlen=SAMPLE_SIZE)
+        self.dts = collections.deque(maxlen=SAMPLE_SIZE)
+
+        # TODO: More
+
+    def run(self):
+        """
+        Starts the acc to control the rover.
+        """
+        self.__power_on()
+
+        self.__main(self.command_queue)
+
+    def __power_on(self):
+        gopigo.trim_write(TRIM)
+
+        # Print out the battery voltage so that we can make sure the that
+        # the batteries are not low
+        time.sleep(0.1)
+        print("Volt: " + str(gopigo.volt()))
+
+        time.sleep(0.1)
+        self.initial_ticks_left = gopigo.enc_read(gopigo.LEFT)
+        time.sleep(0.1)
+        self.initial_ticks_right = gopigo.enc_read(gopigo.RIGHT)
+
+        print("Initial\tL: " + str(self.initial_ticks_left) + "\tR: " + str(self.initial_ticks_right))
+
+    def __main(self, command_queue):
+    #def main():
+        speed = INITIAL_SPEED
+    
+        # gopigo.trim_write(TRIM)
+    
+        # time.sleep(0.1)
+        # print("Volt: " + str(gopigo.volt()))
+    
+        # time.sleep(0.1)
+        # initial_ticks_left = gopigo.enc_read(gopigo.LEFT)
+        # time.sleep(0.1)
+        # initial_ticks_right = gopigo.enc_read(gopigo.RIGHT)
+    
+        # print("Initial\tL: " + str(initial_ticks_left) + "\tR: " + str(initial_ticks_right))
+    
+        global SAFE_DISTANCE
+        global MAX_SPEED
+    
+        print("Critical: " + str(CRITICAL_DISTANCE))
+        print("Safe:     " + str(SAFE_DISTANCE))
+        print("Alert:    " + str(ALERT_DISTANCE))
+    
+        elapsed_ticks_left = 0
+        elapsed_ticks_right = 0
+    
+        try:
+            gopigo.set_speed(0)
+            gopigo.fwd()
+    
+            t = time.time()
+            while True:
+                if speed < 0:
+                    speed = 0
+    
+                print("========================")
+                if not command_queue.empty():
+                    command = command_queue.get()
+                    if isinstance(command, commands.ChangeSettingsCommand):
+                        if command.userSetSpeed is not None:
+                            MAX_SPEED = command.userSetSpeed
+                        else:
+                            pass # TODO
+    
+                        if command.safeDistance is not None:
+                            SAFE_DISTANCE = command.safeDistance
+                        else:
+                            pass # TODO
+    
+                    if isinstance(command, commands.TurnOffCommand):
+                        break
+    
+                #    global MAX_SPEED
+                #    global SAFE_DISTANCE
+                #    MAX_SPEED = comm[0]
+                #    SAFE_DISTANCE = comm[1]
+    
+                #    print(comm)
+    
+                dt = time.time() - t
+                t = time.time()
+    
+                #time.sleep(0.1)
+    
+                print("Time: " + str(dt))
+    
+                dist = get_dist()
+                print("Dist: " + str(dist))
+    
+                if not isinstance(dist, str):
+                    self.dists.append(float(dist))
+                    self.dts.append(float(dt))
+    
+                rel_speed = None
+                if len(self.dists) > 9:
+                    rel_speed = calculate_relative_speed(self.dists, self.dts)
+                    print("Rel speed: " + str(rel_speed))
+    
+                if (isinstance(dist, str) and dist != NOTHING_FOUND) or dist < CRITICAL_DISTANCE:
+                    print("< Critical")
+                    stop_until_safe_distance()
+                    speed = 0
+                    t = time.time()
+                elif dist < SAFE_DISTANCE:
+                    print("< Safe")
+                    if speed > STOP_THRESHOLD:
+                        #speed = speed - dt * SPEED_DECCELLERATION
+                        speed = speed - dt * get_deccelleration(speed)
+                    else:
+                        speed = 0
+                elif speed > MAX_SPEED:
+                    print("Slowing down")
+                    speed = speed - dt * SLOWING_DECCELLERATION
+                elif dist < ALERT_DISTANCE and rel_speed is not None:
+                    speed = handle_alert_distance(speed, rel_speed, dt)
+                elif speed < MAX_SPEED:
+                    print("Speeding up")
+                    speed = speed + dt * SPEED_ACCELERATION
+                    #speed = speed - dt * get_deccelleration(speed)
+    
+                elapsed_ticks_left, elapsed_ticks_right = \
+                    read_enc_ticks(self.initial_ticks_left, self.initial_ticks_right)
+    
+                print("L: " + str(elapsed_ticks_left) + "\tR: " + str(elapsed_ticks_right))
+    
+                l_diff, r_diff = straightness_correction(speed, elapsed_ticks_left, elapsed_ticks_right)
+    
+                if elapsed_ticks_left >= 0 and elapsed_ticks_right >= 0:
+                    set_speed_lr(speed, l_diff, r_diff)
+                else:
+                    set_speed_lr(speed, 0, 0)
+    
+                print("Speed: " + str(speed))
+    
+        except (KeyboardInterrupt, Exception):
+            traceback.print_exc()
+            gopigo.stop()
+        gopigo.stop()
+
+
 
 def get_inc(speed):
     """
@@ -61,128 +239,6 @@ def get_deccelleration(speed):
     :rtype: float
     """
     return (speed ** 2.0) / (2.0 * SLOWDOWN_SPAN)
-
-def main(command_queue):
-#def main():
-    speed = INITIAL_SPEED
-
-    gopigo.trim_write(TRIM)
-
-    time.sleep(0.1)
-    print("Volt: " + str(gopigo.volt()))
-
-    time.sleep(0.1)
-    initial_ticks_left = gopigo.enc_read(LEFT)
-    time.sleep(0.1)
-    initial_ticks_right = gopigo.enc_read(RIGHT)
-
-    print("Initial\tL: " + str(initial_ticks_left) + "\tR: " + str(initial_ticks_right))
-
-    global SAFE_DISTANCE
-    global MAX_SPEED
-
-    print("Critical: " + str(CRITICAL_DISTANCE))
-    print("Safe:     " + str(SAFE_DISTANCE))
-    print("Alert:    " + str(ALERT_DISTANCE))
-
-    dists = collections.deque(maxlen=SAMPLE_SIZE)
-    dts = collections.deque(maxlen=SAMPLE_SIZE)
-
-    elapsed_ticks_left = 0
-    elapsed_ticks_right = 0
-
-    try:
-        gopigo.set_speed(0)
-        gopigo.fwd()
-
-        t = time.time()
-        while True:
-            if speed < 0:
-                speed = 0
-
-            print("========================")
-            if not command_queue.empty():
-                command = command_queue.get()
-                if isinstance(command, commands.ChangeSettingsCommand):
-                    if command.userSetSpeed is not None:
-                        MAX_SPEED = command.userSetSpeed
-                    else:
-                        pass # TODO
-
-                    if command.safeDistance is not None:
-                        SAFE_DISTANCE = command.safeDistance
-                    else:
-                        pass # TODO
-
-                if isinstance(command, commands.TurnOffCommand):
-                    break
-
-            #    global MAX_SPEED
-            #    global SAFE_DISTANCE
-            #    MAX_SPEED = comm[0]
-            #    SAFE_DISTANCE = comm[1]
-
-            #    print(comm)
-
-            dt = time.time() - t
-            t = time.time()
-
-            #time.sleep(0.1)
-
-            print("Time: " + str(dt))
-
-            dist = get_dist()
-            print("Dist: " + str(dist))
-
-            if not isinstance(dist, str):
-                dists.append(float(dist))
-                dts.append(float(dt))
-
-            rel_speed = None
-            if len(dists) > 9:
-                rel_speed = calculate_relative_speed(dists, dts)
-                print("Rel speed: " + str(rel_speed))
-
-            if (isinstance(dist, str) and dist != NOTHING_FOUND) or dist < CRITICAL_DISTANCE:
-                print("< Critical")
-                stop_until_safe_distance()
-                speed = 0
-                t = time.time()
-            elif dist < SAFE_DISTANCE:
-                print("< Safe")
-                if speed > STOP_THRESHOLD:
-                    #speed = speed - dt * SPEED_DECCELLERATION
-                    speed = speed - dt * get_deccelleration(speed)
-                else:
-                    speed = 0
-            elif speed > MAX_SPEED:
-                print("Slowing down")
-                speed = speed - dt * SLOWING_DECCELLERATION
-            elif dist < ALERT_DISTANCE and rel_speed is not None:
-                speed = handle_alert_distance(speed, rel_speed, dt)
-            elif speed < MAX_SPEED:
-                print("Speeding up")
-                speed = speed + dt * SPEED_ACCELERATION
-                #speed = speed - dt * get_deccelleration(speed)
-
-            elapsed_ticks_left, elapsed_ticks_right = \
-                read_enc_ticks(initial_ticks_left, initial_ticks_right)
-
-            print("L: " + str(elapsed_ticks_left) + "\tR: " + str(elapsed_ticks_right))
-
-            l_diff, r_diff = straightness_correction(speed, elapsed_ticks_left, elapsed_ticks_right)
-
-            if elapsed_ticks_left >= 0 and elapsed_ticks_right >= 0:
-                set_speed_lr(speed, l_diff, r_diff)
-            else:
-                set_speed_lr(speed, 0, 0)
-
-            print("Speed: " + str(speed))
-
-    except (KeyboardInterrupt, Exception):
-        traceback.print_exc()
-        gopigo.stop()
-    gopigo.stop()
 
 def handle_alert_distance(speed, rel_speed, dt):
     """
@@ -238,10 +294,10 @@ def straightness_correction(speed, elapsed_ticks_left, elapsed_ticks_right):
 
 def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     time.sleep(0.01)
-    elapsed_ticks_left = enc_read(LEFT) - initial_ticks_left
+    elapsed_ticks_left = gopigo.enc_read(gopigo.LEFT) - initial_ticks_left
     #time.sleep(0.005)
     time.sleep(0.01)
-    elapsed_ticks_right = enc_read(RIGHT) - initial_ticks_right
+    elapsed_ticks_right = gopigo.enc_read(gopigo.RIGHT) - initial_ticks_right
     #time.sleep(0.005)
 
     return (elapsed_ticks_left, elapsed_ticks_right)
@@ -267,7 +323,7 @@ def calculate_relative_speed(dists, dts):
 
 def get_dist():
     time.sleep(0.01)
-    dist = gopigo.us_dist(USS)
+    dist = gopigo.us_dist(gopigo.USS)
 
     if dist == -1:
         return USS_ERROR
@@ -284,6 +340,3 @@ def stop_until_safe_distance():
 
     gopigo.set_speed(0)
     gopigo.fwd()
-
-if __name__ == "__main__":
-    main()
