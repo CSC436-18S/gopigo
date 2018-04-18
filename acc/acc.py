@@ -81,11 +81,11 @@ class ACC(object):
         # TODO: More
 
     def __update_system_info(self):
-        self.system_info.userSetSpeed = self.user_set_speed
-        self.system_info.safeDistance = self.safe_distance
-        self.system_info.curentSpeed = self.speed
-        self.system_info.obstacleDistance = self.obstacle_distance
-        self.system_info.power = self.power_on
+        self.system_info.setUserSetSpeed(self.user_set_speed)
+        self.system_info.setSafeDistance(self.safe_distance)
+        self.system_info.setCurrentSpeed(self.speed)
+        self.system_info.setObstacleDistance(self.obstacle_distance)
+        self.system_info.setPower(self.power_on)
 
     def run(self):
         """
