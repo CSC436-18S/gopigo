@@ -56,18 +56,18 @@ class ACC:
         self.current_speed_left = None                  # This is a velocity
         self.current_speed_right = None                 # This is a velocity
         self.safe_speed = None
-        self.left_power = None
-        self.right_power = None
+        self.left_power = 0
+        self.right_power = 0
         self.left_rotation_rate = None                  # Ticks per second
         self.right_rotation_rate = None                 # Ticks per second
         self.minimum_settable_safe_distance = None
-        self.delta_ticks_l = None
-        self.delta_ticks_r = None
+        self.delta_ticks_l = 0
+        self.delta_ticks_r = 0
         self.obstacle_distance = None
         self.obstacle_velocity = None
         self.obstacle_acceleration = None
-        self.prev_achieved_v_l = None
-        self.prev_achieved_v_r = None
+        self.prev_achieved_v_l = 0
+        self.prev_achieved_v_r = 0
         self.set_speed = None
         self.set_distance = None
         self.v_desired_left = None
@@ -255,11 +255,21 @@ class ACC:
         self.prev_achieved_v_l = (self.delta_ticks_l/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
         self.prev_achieved_v_r = (self.delta_ticks_r/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
 
-        v_new_l = (self.prev_achieved_v_l - v_old_l)*(self.left_power/v_old_l)*self.v_desired_left
-        v_new_r = (self.prev_achieved_v_r - v_old_r)*(self.right_power/v_old_r)*self.v_desired_right
+        if v_old_l == 0:
+            v_new_l = self.v_desired_left
+        else:
+            v_new_l = (self.prev_achieved_v_l - v_old_l)*(self.left_power/v_old_l)*self.v_desired_left
 
-        self.left_power = self.left_power + (v_new_l*(self.left_power/self.prev_achieved_v_l))
-        self.right_power = self.right_power + (v_new_r*(self.right_power/self.prev_achieved_v_r))
+        if v_old_r == 0:
+            v_new_r = self.v_desired_right
+        else:
+            v_new_r = (self.prev_achieved_v_r - v_old_r)*(self.right_power/v_old_r)*self.v_desired_right
+
+        if self.prev_achieved_v_l != 0:
+            self.left_power = self.left_power + (v_new_l*(self.left_power/self.prev_achieved_v_l))
+
+        if self.prev_achieved_v_r != 0:
+            self.right_power = self.right_power + (v_new_r*(self.right_power/self.prev_achieved_v_r))
 
         if self.left_power > MAX_POWER_VALUE:
             self.left_power = MAX_POWER_VALUE
@@ -275,8 +285,8 @@ class ACC:
         else:
             if gopigo.enc_read(gopigo.LEFT) == 0 and gopigo.enc_read(gopigo.RIGHT) == 0:
                 gopigo.fwd()
-            gopigo.set_left_speed(self.left_power)
-            gopigo.set_right_speed(self.right_power)
+            gopigo.set_left_speed(int(self.left_power))
+            gopigo.set_right_speed(int(self.right_power))
 
 
     def power_off(self, prev_time):
