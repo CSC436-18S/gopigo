@@ -7,6 +7,7 @@ class SystemInfo():
 
         self.userSetSpeed = 0
         self.safeDistance = 9999
+        self.criticalDistance = 0
         self.alertDistance = 0
 
         self.power = True
@@ -22,6 +23,9 @@ class SystemInfo():
 
     def getSafeDistance(self):
         return self.safeDistance
+
+    def getCriticalDistance(self):
+        return self.criticalDistance
 
     def getAlertDistance(self):
         return self.alertDistance
@@ -46,6 +50,9 @@ class SystemInfo():
 
     def setSafeDistance(self, distance):
         self.safeDistance = distance
+
+    def setCriticalDistance(self, distance):
+        self.criticalDistance = distance
 
     def setAlertDistance(self, distance):
         self.alertDistance = distance

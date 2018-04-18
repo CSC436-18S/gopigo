@@ -94,7 +94,8 @@ class ACC(object):
 
         self.system_info.setUserSetSpeed(self.user_set_speed)
         self.system_info.setSafeDistance(self.safe_distance)
-        self.system_info.setAlertDistance(self.alert_distance)
+        self.system_info.setCriticalDistance(int(self.critical_distance))
+        self.system_info.setAlertDistance(int(self.alert_distance))
 
         self.system_info.setPower(self.power_on)
 
