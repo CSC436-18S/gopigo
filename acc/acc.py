@@ -61,6 +61,10 @@ class ACC(object):
         self.initial_ticks_left = 0
         self.initial_ticks_right = 0
 
+        self.power_on = False
+
+        self.obstacle_distance = None
+
         self.dists = collections.deque(maxlen=SAMPLE_SIZE)
         self.dts = collections.deque(maxlen=SAMPLE_SIZE)
 
@@ -75,6 +79,8 @@ class ACC(object):
         self.__main(self.command_queue)
 
     def __power_on(self):
+        self.power_on = True
+
         gopigo.trim_write(TRIM)
 
         # Print out the battery voltage so that we can make sure the that
@@ -89,57 +95,101 @@ class ACC(object):
 
         print("Initial\tL: " + str(self.initial_ticks_left) + "\tR: " + str(self.initial_ticks_right))
 
-    def __main(self, command_queue):
-    #def main():
-        speed = INITIAL_SPEED
-    
-        # gopigo.trim_write(TRIM)
-    
-        # time.sleep(0.1)
-        # print("Volt: " + str(gopigo.volt()))
-    
-        # time.sleep(0.1)
-        # initial_ticks_left = gopigo.enc_read(gopigo.LEFT)
-        # time.sleep(0.1)
-        # initial_ticks_right = gopigo.enc_read(gopigo.RIGHT)
-    
-        # print("Initial\tL: " + str(initial_ticks_left) + "\tR: " + str(initial_ticks_right))
-    
+    def __process_commands(self):
         global SAFE_DISTANCE
-        global MAX_SPEED
-    
+
+        if not self.command_queue.empty():
+            command = self.command_queue.get()
+            if isinstance(command, commands.ChangeSettingsCommand):
+                if command.userSetSpeed is not None:
+                    self.user_set_speed = command.userSetSpeed
+                else:
+                    pass # TODO
+
+                if command.safeDistance is not None:
+                    SAFE_DISTANCE = command.safeDistance
+                else:
+                    pass # TODO
+
+            if isinstance(command, commands.TurnOffCommand):
+                self.power_on = False
+
+    def __observe_obstacle(self, dt):
+        self.obstacle_distance = get_dist()
+        print("Dist: " + str(self.obstacle_distance))
+
+        if not isinstance(self.obstacle_distance, str):
+            self.dists.append(float(self.obstacle_distance))
+            self.dts.append(float(dt))
+
+        self.obstacle_relative_speed = None
+        if len(self.dists) > 9:
+            self.obstacle_relative_speed = calculate_relative_speed(self.dists, self.dts)
+            print("Rel speed: " + str(self.obstacle_relative_speed))
+
+    def __stop_until_safe_distance(self):
+        gopigo.stop()
+        self.obstacle_distance = get_dist()
+        while (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance < SAFE_DISTANCE:
+            self.obstacle_distance = get_dist()
+
+        gopigo.set_speed(0)
+        gopigo.fwd()
+
+    def __handle_alert_distance(self, speed, dt):
+        """
+        Determines the new speed of the rover when it is in the alert distance
+        in order to attempt to match the speed of the obstacle.
+
+        Keeps going at a minimum speed even if the obstacle is not moving so that
+        it will stop around the safe distance.
+
+        :param float speed: The current speed of the rover (power units)
+        :param float dt: The change in time for the previous run of the main loop (s)
+        :return: The new speed of the rover (power units)
+        :rtype: float
+        """
+        if self.obstacle_relative_speed > ALERT_THRESHOLD:
+            print("Alert speeding")
+            new_speed = speed + dt * SPEED_ACCELERATION
+
+            return new_speed
+        elif self.obstacle_relative_speed < -ALERT_THRESHOLD:
+            print("Alert slowing")
+            new_speed = speed - dt * SLOWING_DECCELLERATION
+
+            if new_speed < MIN_SPEED:
+                new_speed = MIN_SPEED
+
+            return new_speed
+        else:
+            print("Alert stable")
+            return speed
+
+    def __main(self, command_queue):
+        speed = INITIAL_SPEED
+
+        global SAFE_DISTANCE
+        #global MAX_SPEED
+
         print("Critical: " + str(CRITICAL_DISTANCE))
         print("Safe:     " + str(SAFE_DISTANCE))
         print("Alert:    " + str(ALERT_DISTANCE))
-    
+
         elapsed_ticks_left = 0
         elapsed_ticks_right = 0
-    
+
         try:
             gopigo.set_speed(0)
             gopigo.fwd()
-    
+
             t = time.time()
-            while True:
+            while self.power_on:
                 if speed < 0:
                     speed = 0
-    
+
                 print("========================")
-                if not command_queue.empty():
-                    command = command_queue.get()
-                    if isinstance(command, commands.ChangeSettingsCommand):
-                        if command.userSetSpeed is not None:
-                            MAX_SPEED = command.userSetSpeed
-                        else:
-                            pass # TODO
-    
-                        if command.safeDistance is not None:
-                            SAFE_DISTANCE = command.safeDistance
-                        else:
-                            pass # TODO
-    
-                    if isinstance(command, commands.TurnOffCommand):
-                        break
+                self.__process_commands()
     
                 #    global MAX_SPEED
                 #    global SAFE_DISTANCE
@@ -154,37 +204,39 @@ class ACC(object):
                 #time.sleep(0.1)
     
                 print("Time: " + str(dt))
+
+                self.__observe_obstacle(dt)
     
-                dist = get_dist()
-                print("Dist: " + str(dist))
+                #dist = get_dist()
+                #print("Dist: " + str(dist))
     
-                if not isinstance(dist, str):
-                    self.dists.append(float(dist))
-                    self.dts.append(float(dt))
+                #if not isinstance(dist, str):
+                #    self.dists.append(float(dist))
+                #    self.dts.append(float(dt))
     
-                rel_speed = None
-                if len(self.dists) > 9:
-                    rel_speed = calculate_relative_speed(self.dists, self.dts)
-                    print("Rel speed: " + str(rel_speed))
+                #rel_speed = None
+                #if len(self.dists) > 9:
+                #    rel_speed = calculate_relative_speed(self.dists, self.dts)
+                #    print("Rel speed: " + str(rel_speed))
     
-                if (isinstance(dist, str) and dist != NOTHING_FOUND) or dist < CRITICAL_DISTANCE:
+                if (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance < CRITICAL_DISTANCE:
                     print("< Critical")
-                    stop_until_safe_distance()
+                    self.__stop_until_safe_distance()
                     speed = 0
                     t = time.time()
-                elif dist < SAFE_DISTANCE:
+                elif self.obstacle_distance < SAFE_DISTANCE:
                     print("< Safe")
                     if speed > STOP_THRESHOLD:
                         #speed = speed - dt * SPEED_DECCELLERATION
                         speed = speed - dt * get_deccelleration(speed)
                     else:
                         speed = 0
-                elif speed > MAX_SPEED:
+                elif speed > self.user_set_speed:
                     print("Slowing down")
                     speed = speed - dt * SLOWING_DECCELLERATION
-                elif dist < ALERT_DISTANCE and rel_speed is not None:
-                    speed = handle_alert_distance(speed, rel_speed, dt)
-                elif speed < MAX_SPEED:
+                elif self.obstacle_distance < ALERT_DISTANCE and self.obstacle_relative_speed is not None:
+                    speed = self.__handle_alert_distance(speed, dt)
+                elif speed < self.user_set_speed:
                     print("Speeding up")
                     speed = speed + dt * SPEED_ACCELERATION
                     #speed = speed - dt * get_deccelleration(speed)
@@ -239,37 +291,6 @@ def get_deccelleration(speed):
     :rtype: float
     """
     return (speed ** 2.0) / (2.0 * SLOWDOWN_SPAN)
-
-def handle_alert_distance(speed, rel_speed, dt):
-    """
-    Determines the new speed of the rover when it is in the alert distance
-    in order to attempt to match the speed of the obstacle.
-
-    Keeps going at a minimum speed even if the obstacle is not moving so that
-    it will stop around the safe distance.
-
-    :param float speed: The current speed of the rover (power units)
-    :param float rel_speed: The speed of the obstacle relative to the rover (cm / s)
-    :param float dt: The change in time for the previous run of the main loop (s)
-    :return: The new speed of the rover (power units)
-    :rtype: float
-    """
-    if rel_speed > ALERT_THRESHOLD:
-        print("Alert speeding")
-        new_speed = speed + dt * SPEED_ACCELERATION
-
-        return new_speed
-    elif rel_speed < -ALERT_THRESHOLD:
-        print("Alert slowing")
-        new_speed = speed - dt * SLOWING_DECCELLERATION
-
-        if new_speed < MIN_SPEED:
-            new_speed = MIN_SPEED
-
-        return new_speed
-    else:
-        print("Alert stable")
-        return speed
 
 def straightness_correction(speed, elapsed_ticks_left, elapsed_ticks_right):
     """
@@ -331,12 +352,3 @@ def get_dist():
         return NOTHING_FOUND
     else:
         return dist
-
-def stop_until_safe_distance():
-    gopigo.stop()
-    dist = get_dist()
-    while (isinstance(dist, str) and dist != NOTHING_FOUND) or dist < SAFE_DISTANCE:
-        dist = get_dist()
-
-    gopigo.set_speed(0)
-    gopigo.fwd()
