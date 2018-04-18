@@ -32,60 +32,6 @@ ALERT_THRESHOLD = 5.0 # 0.01
 USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
 
-
-ADDRESS = 0x08
-ENC_READ_CMD = [53]
-
-LEFT = 0
-RIGHT = 1
-
-USS = 15
-
-BUS = smbus.SMBus(1)
-
-def write_i2c_block(address, block):
-    try:
-        op = BUS.write_i2c_block_data(address, 1, block)
-        time.sleep(0.005)
-        return op
-    except IOError:
-        return -1
-    return 1
-
-def enc_read(motor):
-    write_i2c_block(ADDRESS, ENC_READ_CMD+[motor, 0, 0])
-    #time.sleep(0.01)
-    #time.sleep(0.08)
-    try:
-        b1 = BUS.read_byte(ADDRESS)
-        b2 = BUS.read_byte(ADDRESS)
-    except IOError:
-        return -1
-    if b1 != -1 and b2 != -1:
-        v = b1 * 256 + b2
-        return v
-    else:
-        return -1
-
-US_CMD = [117]
-
-def us_dist(pin):
-    write_i2c_block(ADDRESS, US_CMD+[pin, 0, 0])
-    time.sleep(0.01)
-    #time.sleep(0.08)
-    try:
-        b1 = BUS.read_byte(ADDRESS)
-        b2 = BUS.read_byte(ADDRESS)
-    except IOError:
-        return -1
-    if b1 != -1 and b2 != -1:
-        v = b1 * 256 + b2
-        return v
-    else:
-        return -1
-
-###############################################
-
 def get_inc(speed):
     """
     Returns the power amount to use in straightness correcting.
@@ -126,9 +72,9 @@ def main(command_queue):
     print("Volt: " + str(gopigo.volt()))
 
     time.sleep(0.1)
-    initial_ticks_left = enc_read(LEFT)
+    initial_ticks_left = gopigo.enc_read(LEFT)
     time.sleep(0.1)
-    initial_ticks_right = enc_read(RIGHT)
+    initial_ticks_right = gopigo.enc_read(RIGHT)
 
     print("Initial\tL: " + str(initial_ticks_left) + "\tR: " + str(initial_ticks_right))
 
@@ -321,7 +267,7 @@ def calculate_relative_speed(dists, dts):
 
 def get_dist():
     time.sleep(0.01)
-    dist = us_dist(USS)
+    dist = gopigo.us_dist(USS)
 
     if dist == -1:
         return USS_ERROR

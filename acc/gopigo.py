@@ -147,8 +147,8 @@ def enc_read(motor):
     #time.sleep(0.01)
     #time.sleep(0.08)
     try:
-        b1 = BUS.read_byte(ADDRESS)
-        b2 = BUS.read_byte(ADDRESS)
+        b1 = bus.read_byte(ADDRESS)
+        b2 = bus.read_byte(ADDRESS)
     except IOError:
         return -1
     if b1 != -1 and b2 != -1:
@@ -192,6 +192,7 @@ def fwd(dist=0): #distance is in cm
 
 def us_dist(pin):
     write_i2c_block(ADDRESS, US_CMD+[pin,0,0])
+    time.sleep(0.01)
     #time.sleep(0.08)
     try:
         b1 = bus.read_byte(ADDRESS)
