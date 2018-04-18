@@ -217,7 +217,11 @@ class ACC(object):
         print("Alert: " + str(self.alert_distance))
 
     def __validate_user_settings(self):
-        pass # TODO
+        if self.user_set_speed > MAX_SPEED:
+            self.user_set_speed = MAX_SPEED
+
+        if self.safe_distance < self.minimum_settable_safe_distance:
+            self.safe_distance = self.minimum_settable_safe_distance
 
     def __obstacle_based_acceleration_determination(self, dt):
         if (isinstance(self.obstacle_distance, str) and \
@@ -340,7 +344,8 @@ def get_inc(speed):
     if speed < 0.1 and speed > -0.1:
         return 0
     else:
-        return (9.0 / (speed / INC_CONST)) / 1.5
+        #return (9.0 / (speed / INC_CONST)) / 1.5
+        return 2.0 * (9.0 / (speed / INC_CONST)) / 1.5
 
 def get_deccelleration(speed):
     """
