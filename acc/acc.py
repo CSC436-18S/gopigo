@@ -110,7 +110,8 @@ class ACC(object):
         time.sleep(0.1)
         self.initial_ticks_right = gopigo.enc_read(gopigo.RIGHT)
 
-        print("Initial\tL: " + str(self.initial_ticks_left) + "\tR: " + str(self.initial_ticks_right))
+        print("Initial\tL: " + str(self.initial_ticks_left) + "\tR: " + \
+            str(self.initial_ticks_right))
 
     def __process_commands(self):
         if not self.command_queue.empty():
@@ -145,7 +146,9 @@ class ACC(object):
     def __stop_until_safe_distance(self):
         gopigo.stop()
         self.obstacle_distance = get_dist()
-        while (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance < self.safe_distance:
+        while (isinstance(self.obstacle_distance, str) and \
+            self.obstacle_distance != NOTHING_FOUND) or \
+            self.obstacle_distance < self.safe_distance:
             self.obstacle_distance = get_dist()
 
         gopigo.set_speed(0)
@@ -190,7 +193,9 @@ class ACC(object):
         pass
 
     def __obstacle_based_acceleration_determination(self, dt):
-        if (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance <= CRITICAL_DISTANCE:
+        if (isinstance(self.obstacle_distance, str) and \
+            self.obstacle_distance != NOTHING_FOUND) or \
+            self.obstacle_distance <= CRITICAL_DISTANCE:
             print("<= Critical")
             self.__stop_until_safe_distance()
             self.speed = 0
@@ -205,7 +210,8 @@ class ACC(object):
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
-        elif self.obstacle_distance <= self.__get_alert_distance() and self.obstacle_relative_speed is not None:
+        elif self.obstacle_distance <= self.__get_alert_distance() and \
+            self.obstacle_relative_speed is not None:
             self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
             print("Speeding up")
