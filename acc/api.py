@@ -87,10 +87,15 @@ def run(isDebug, command_queue, system_info_temp):
 def getJson():
     state = OrderedDict([
         ('currentSpeed', system_info.getCurrentSpeed()),
-        ('obstacleDistance', system_info.getObstacleDistance())])
+        ('obstacleDistance', system_info.getObstacleDistance()),
+        #('ticksLeft', system_info.getTicksLeft()),
+        #('ticksRight', system_info.getTicksRight())
+        ('ticsDifference', system_info.getTicksLeft() - system_info.getTicksRight())
+    ])
     settings = OrderedDict([
         ('userSetSpeed', system_info.getUserSetSpeed()),
-        ('safeDistance', system_info.getSafeDistance())
+        ('safeDistance', system_info.getSafeDistance()),
+        ('alertDistance', system_info.getAlertDistance())
     ])
     res = json.dumps({
         "state": state,

@@ -74,6 +74,8 @@ class ACC(object):
         self.obstacle_distance = None
         self.obstacle_relative_speed = None
 
+        self.alert_distance = 0
+
         self.t = 0
 
         self.dists = collections.deque(maxlen=SAMPLE_SIZE)
@@ -82,11 +84,18 @@ class ACC(object):
         # TODO: More
 
     def __update_system_info(self):
-        self.system_info.setUserSetSpeed(self.user_set_speed)
-        self.system_info.setSafeDistance(self.safe_distance)
         self.system_info.setCurrentSpeed(self.speed)
         self.system_info.setObstacleDistance(self.obstacle_distance)
+        self.system_info.setTicksLeft(self.elapsed_ticks_left)
+        self.system_info.setTicksRight(self.elapsed_ticks_right)
+
+        self.system_info.setUserSetSpeed(self.user_set_speed)
+        self.system_info.setSafeDistance(self.safe_distance)
+        self.system_info.setAlertDistance(self.alert_distance)
+
         self.system_info.setPower(self.power_on)
+
+        # TODO: Add more values
 
     def run(self):
         """
@@ -121,12 +130,13 @@ class ACC(object):
                 if command.userSetSpeed is not None:
                     self.user_set_speed = command.userSetSpeed
                 else:
-                    pass # TODO
+                    motor_speeds = gopigo.read_motor_speed()
+                    self.user_set_speed = (motor_speeds[0] + motor_speeds[1]) / 2.0
 
                 if command.safeDistance is not None:
                     self.safe_distance = command.safeDistance
                 else:
-                    pass # TODO
+                    self.safe_distance = gopigo.us_dist(gopigo.USS)
 
             if isinstance(command, commands.TurnOffCommand):
                 self.power_on = False
@@ -184,14 +194,12 @@ class ACC(object):
             print("Alert stable")
             return self.speed
 
-    def __get_alert_distance(self):
-        return self.safe_distance * ALERT_DISTANCE_CONST
-
     def __calculate_relevant_distances(self):
-        pass
+        self.alert_distance = self.safe_distance * ALERT_DISTANCE_CONST
+        pass # TODO
 
     def __validate_user_settings(self):
-        pass
+        pass # TODO
 
     def __obstacle_based_acceleration_determination(self, dt):
         if (isinstance(self.obstacle_distance, str) and \
@@ -211,7 +219,7 @@ class ACC(object):
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
-        elif self.obstacle_distance <= self.__get_alert_distance() and \
+        elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
             self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
@@ -256,13 +264,9 @@ class ACC(object):
             gopigo.set_right_speed(0)
 
     def __main(self):
-        #self.speed = INITIAL_SPEED
-
-        #global MAX_SPEED
-
-        print("Critical: " + str(CRITICAL_DISTANCE))
-        print("Safe:     " + str(self.safe_distance))
-        print("Alert:    " + str(self.__get_alert_distance()))
+        #print("Critical: " + str(CRITICAL_DISTANCE))
+        #print("Safe:     " + str(self.safe_distance))
+        #print("Alert:    " + str(self.alert_distance))
 
 
         try:

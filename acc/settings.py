@@ -1,9 +1,14 @@
 class SystemInfo():
     def __init__(self):
-        self.userSetSpeed = 0
-        self.safeDistance = 9999
         self.currentSpeed = 0
         self.obstacleDistance = 9999
+        self.ticksLeft = 0
+        self.ticksRight = 0
+
+        self.userSetSpeed = 0
+        self.safeDistance = 9999
+        self.alertDistance = 0
+
         self.power = True
 
     def getPower(self):
@@ -18,8 +23,17 @@ class SystemInfo():
     def getSafeDistance(self):
         return self.safeDistance
 
+    def getAlertDistance(self):
+        return self.alertDistance
+
     def getObstacleDistance(self):
         return self.obstacleDistance
+
+    def getTicksLeft(self):
+        return self.ticksLeft
+
+    def getTicksRight(self):
+        return self.ticksRight
 
     def setPower(self, power):
         self.power = power
@@ -28,10 +42,19 @@ class SystemInfo():
         self.userSetSpeed = speed
 
     def setCurrentSpeed(self, speed):
-        self.currentSpeed = speed
+        self.currentSpeed = int(speed)
 
     def setSafeDistance(self, distance):
         self.safeDistance = distance
-    
+
+    def setAlertDistance(self, distance):
+        self.alertDistance = distance
+
     def setObstacleDistance(self, distance):
         self.obstacleDistance = distance
+
+    def setTicksLeft(self, ticks):
+        self.ticksLeft = ticks
+
+    def setTicksRight(self, ticks):
+        self.ticksRight = ticks
