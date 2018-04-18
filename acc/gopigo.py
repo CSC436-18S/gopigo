@@ -31,6 +31,9 @@ trim_write_cmd = [31]
 ENC_READ_CMD = [53]
 volt_cmd = [118]
 stop_cmd = [120]
+read_motor_speed_cmd = [114]
+
+unused = 0
 
 def write_i2c_block(address, block):
     try:
@@ -167,7 +170,10 @@ def stop():
     :return: A value indicating if the action suceeded.
     :rtype: int
     """
-    return write_i2c_block(ADDRESS,stop_cmd+[0,0,0])
+    status = write_i2c_block(ADDRESS,stop_cmd+[0,0,0])
+    set_left_speed(0)
+    set_right_speed(0)
+    return status
 
 def fwd(dist=0): #distance is in cm
     """
@@ -208,7 +214,7 @@ def us_dist(pin):
 
 
 def read_motor_speed():
-    write_i2c_block(address,read_motor_speed_cmd+[unused,unused,unused])
+    write_i2c_block(ADDRESS,read_motor_speed_cmd+[unused,unused,unused])
     try:
         s1=bus.read_byte(ADDRESS)
         s2=bus.read_byte(ADDRESS)

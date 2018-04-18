@@ -51,7 +51,8 @@ class ACC(object):
         self.command_queue = command_queue
 
         if user_set_speed is None:
-            pass # TODO
+            motor_speeds = gopigo.read_motor_speed()
+            self.user_set_speed = (motor_speeds[0] + motor_speeds[1]) / 2.0
         else:
             self.user_set_speed = user_set_speed
 
