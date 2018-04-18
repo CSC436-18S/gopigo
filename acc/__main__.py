@@ -35,7 +35,7 @@ def main():
     #print(str(os.getpid()) + " <> " + str(listen_pid))
 
     #if os.getpid() != listen_pid:
-    acc_instance = acc.ACC(command_queue, 150, 80)
+    acc_instance = acc.ACC(command_queue, 150, 30)
     acc_instance.run()
     #acc.main(command_queue)
 
