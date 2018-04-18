@@ -9,6 +9,7 @@ from __future__ import print_function
 import multiprocessing
 from multiprocessing.managers import BaseManager
 import settings
+import sys
 
 import acc
 import api
@@ -28,6 +29,8 @@ def main():
     The main function of the ACC program. It starts up the ACC and runs the
     webserver for the user interface.
     """
+    user_set_speed, safe_distance = get_intial_user_settings(sys.argv)
+
     command_queue = multiprocessing.Queue()
     manager = SettingsManager()
     manager.start()
@@ -39,9 +42,21 @@ def main():
 
     listener_process.start()
 
-    acc_instance = acc.ACC(system_info, command_queue, 150, 30)
+    acc_instance = acc.ACC(system_info, command_queue, user_set_speed, safe_distance)
     acc_instance.run()
 
+def get_intial_user_settings(argv):
+    user_set_speed = None
+    safe_distance = None
+    for a in argv[1:]:
+        splitted = a.split("=")
+        print(splitted)
+        if splitted[0] == "speed":
+            user_set_speed = int(splitted[1])
+        elif splitted[0] == "distance":
+            safe_distance = int(splitted[1])
+
+    return (user_set_speed, safe_distance)
 
 if __name__ == "__main__":
     main()
