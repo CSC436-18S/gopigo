@@ -10,7 +10,7 @@ import commands
 
 TRIM = 0#5#0
 INITIAL_SPEED = 50
-MAX_SPEED = 150 #200
+MAX_SPEED = 250
 MIN_SPEED = 30
 
 INC_CONST = 100.0 #100.0
@@ -21,10 +21,11 @@ SAFE_DISTANCE = 2 * CRITICAL_DISTANCE
 ALERT_DISTANCE_CONST = 3
 SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
 
+BUFFER_DISTANCE = 10 # cm
+TIMESTEPS_TO_APPROACH_SD = 10
+
 SLOWING_DECCELLERATION = 50#100 # power units / second
 SPEED_ACCELERATION = 40#100 # power units / second
-
-BUFFER_DISTANCE = 30 # cm
 
 STOP_THRESHOLD = 0.01
 
@@ -74,6 +75,8 @@ class ACC(object):
         self.obstacle_distance = None
         self.obstacle_relative_speed = None
 
+        self.critical_distance = 0
+        self.minimum_settable_safe_distance = 0
         self.alert_distance = 0
 
         self.t = 0
@@ -96,6 +99,7 @@ class ACC(object):
         self.system_info.setPower(self.power_on)
 
         # TODO: Add more values
+        # Voltage
 
     def run(self):
         """
@@ -122,6 +126,9 @@ class ACC(object):
 
         print("Initial\tL: " + str(self.initial_ticks_left) + "\tR: " + \
             str(self.initial_ticks_right))
+
+    def __power_to_velocity(self, power):
+        return 0.192 * power
 
     def __process_commands(self):
         if not self.command_queue.empty():
@@ -194,9 +201,20 @@ class ACC(object):
             print("Alert stable")
             return self.speed
 
-    def __calculate_relevant_distances(self):
-        self.alert_distance = self.safe_distance * ALERT_DISTANCE_CONST
-        pass # TODO
+    def __calculate_relevant_distances(self, dt):
+        self.critical_distance = CRITICAL_DISTANCE
+        #self.critical_distance = 10 * (self.speed / float(MAX_SPEED))
+        self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISTANCE
+
+        #self.alert_distance = self.safe_distance * ALERT_DISTANCE_CONST
+        if self.obstacle_relative_speed is not None:
+            self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
+        else:
+            self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * self.speed
+
+        print("Critical: " + str(self.critical_distance))
+        print("Minimum: " + str(self.minimum_settable_safe_distance))
+        print("Alert: " + str(self.alert_distance))
 
     def __validate_user_settings(self):
         pass # TODO
@@ -204,24 +222,26 @@ class ACC(object):
     def __obstacle_based_acceleration_determination(self, dt):
         if (isinstance(self.obstacle_distance, str) and \
             self.obstacle_distance != NOTHING_FOUND) or \
-            self.obstacle_distance <= CRITICAL_DISTANCE:
+            self.obstacle_distance <= self.critical_distance:
             print("<= Critical")
             self.__stop_until_safe_distance()
             self.speed = 0
             self.t = time.time()
         elif self.obstacle_distance <= self.safe_distance:
             print("<= Safe")
-            if self.speed > STOP_THRESHOLD:
+            #if self.speed > STOP_THRESHOLD:
                 #speed = speed - dt * SPEED_DECCELLERATION
-                self.speed = self.speed - dt * get_deccelleration(self.speed)
-            else:
-                self.speed = 0
+            #    self.speed = self.speed - dt * get_deccelleration(self.speed)
+            #else:
+            #    self.speed = 0
+            self.speed = self.speed + (self.__power_to_velocity(self.obstacle_distance - self.safe_distance) / dt)
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
             self.speed = self.__handle_alert_distance(dt)
+            #self.speed = self.speed + ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt))
         elif self.speed < self.user_set_speed:
             print("Speeding up")
             self.speed = self.speed + dt * SPEED_ACCELERATION
@@ -289,7 +309,7 @@ class ACC(object):
                 print("Time: " + str(dt))
 
                 self.__observe_obstacle(dt)
-                self.__calculate_relevant_distances()
+                self.__calculate_relevant_distances(dt)
 
                 self.__validate_user_settings()
 

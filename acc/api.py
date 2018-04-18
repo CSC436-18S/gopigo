@@ -50,9 +50,9 @@ COMMAND_QUEUE = None
   if wlp2s0 cannot be found, default to wlan0
 """
 try:
-    HOSTNAME = get_ip_address('wlp2s0')
+    HOSTNAME = "kat.local"#get_ip_address('wlp2s0')
 except IOError:
-    HOSTNAME = get_ip_address('wlan0')
+    HOSTNAME = "kat.local"#get_ip_address('wlan0')
 
 
 @app.route('/')
