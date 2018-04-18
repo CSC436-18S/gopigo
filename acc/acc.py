@@ -63,6 +63,9 @@ class ACC(object):
         self.initial_ticks_left = 0
         self.initial_ticks_right = 0
 
+        self.elapsed_ticks_left = 0
+        self.elapsed_ticks_right = 0
+
         self.speed = INITIAL_SPEED
 
         self.power_on = False
@@ -209,6 +212,42 @@ class ACC(object):
             self.speed = self.speed + dt * SPEED_ACCELERATION
             #speed = speed - dt * get_deccelleration(speed)
 
+
+    def __straightness_correction(self):
+        """
+        Returns the power adjustments to make to each motor to correct the
+        straightness of the path of the rover.
+
+        :return: The left and right motor speed adjustments (power units)
+        :rtype: tuple[float, float]
+        """
+        self.elapsed_ticks_left, self.elapsed_ticks_right = \
+            read_enc_ticks(self.initial_ticks_left, self.initial_ticks_right)
+
+        print("L: " + str(self.elapsed_ticks_left) + "\tR: " + str(self.elapsed_ticks_right))
+
+        # Handle invalid encoder readings
+        if self.elapsed_ticks_left < 0 and self.elapsed_ticks_right < 0:
+            print("Bad encoder reading")
+            return (0, 0)
+        if self.elapsed_ticks_left > self.elapsed_ticks_right:
+            print("Right slow")
+            return (-get_inc(self.speed), get_inc(self.speed))
+        elif self.elapsed_ticks_left < self.elapsed_ticks_right:
+            print("Left slow")
+            return (get_inc(self.speed), -get_inc(self.speed))
+        else:
+            print("Equal")
+            return (0, 0)
+
+    def __actualize_power(self, l_diff, r_diff):
+        if self.speed >= MIN_SPEED:
+            gopigo.set_left_speed(int(self.speed + l_diff))
+            gopigo.set_right_speed(int(self.speed + r_diff))
+        else:
+            gopigo.set_left_speed(0)
+            gopigo.set_right_speed(0)
+
     def __main(self):
         #self.speed = INITIAL_SPEED
 
@@ -218,8 +257,6 @@ class ACC(object):
         print("Safe:     " + str(self.safe_distance))
         print("Alert:    " + str(self.__get_alert_distance()))
 
-        elapsed_ticks_left = 0
-        elapsed_ticks_right = 0
 
         try:
             gopigo.set_speed(0)
@@ -247,17 +284,9 @@ class ACC(object):
 
                 self.__obstacle_based_acceleration_determination(dt)
 
-                elapsed_ticks_left, elapsed_ticks_right = \
-                    read_enc_ticks(self.initial_ticks_left, self.initial_ticks_right)
+                l_diff, r_diff = self.__straightness_correction()
 
-                print("L: " + str(elapsed_ticks_left) + "\tR: " + str(elapsed_ticks_right))
-
-                l_diff, r_diff = straightness_correction(self.speed, elapsed_ticks_left, elapsed_ticks_right)
-
-                if elapsed_ticks_left >= 0 and elapsed_ticks_right >= 0:
-                    set_speed_lr(self.speed, l_diff, r_diff)
-                else:
-                    set_speed_lr(self.speed, 0, 0)
+                self.__actualize_power(l_diff, r_diff)
 
                 print("Speed: " + str(self.speed))
 
@@ -296,27 +325,6 @@ def get_deccelleration(speed):
     """
     return (speed ** 2.0) / (2.0 * SLOWDOWN_SPAN)
 
-def straightness_correction(speed, elapsed_ticks_left, elapsed_ticks_right):
-    """
-    Returns the power adjustments to make to each motor to correct the
-    straightness of the path of the rover.
-
-    :param float speed: The speed that the rover is going at (power units)
-    :param int elapsed_ticks_left: The number of left ticks (ticks)
-    :param int elapsed_ticks_right: The number of right ticks (ticks)
-    :return: The left and right motor speed adjustments (power units)
-    :rtype: tuple[float, float]
-    """
-    if elapsed_ticks_left > elapsed_ticks_right:
-        print("Right slow")
-        return (-get_inc(speed), get_inc(speed))
-    elif elapsed_ticks_left < elapsed_ticks_right:
-        print("Left slow")
-        return (get_inc(speed), -get_inc(speed))
-    else:
-        print("Equal")
-        return (0, 0)
-
 def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     time.sleep(0.01)
     elapsed_ticks_left = gopigo.enc_read(gopigo.LEFT) - initial_ticks_left
@@ -326,14 +334,6 @@ def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     #time.sleep(0.005)
 
     return (elapsed_ticks_left, elapsed_ticks_right)
-
-def set_speed_lr(speed, l_diff, r_diff):
-    if speed >= MIN_SPEED:
-        gopigo.set_left_speed(int(speed + l_diff))
-        gopigo.set_right_speed(int(speed + r_diff))
-    else:
-        gopigo.set_left_speed(0)
-        gopigo.set_right_speed(0)
 
 def calculate_relative_speed(dists, dts):
     old_dist = sum(list(dists)[0:len(dists) / 2]) / (len(dists) / 2)
