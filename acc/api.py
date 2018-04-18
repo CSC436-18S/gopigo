@@ -50,9 +50,9 @@ COMMAND_QUEUE = None
   if wlp2s0 cannot be found, default to wlan0
 """
 try:
-    HOSTNAME = "kat.local"#get_ip_address('wlp2s0')
+    HOSTNAME = get_ip_address('wlp2s0')
 except IOError:
-    HOSTNAME = "kat.local"#get_ip_address('wlan0')
+    HOSTNAME = get_ip_address('wlan0')
 
 
 @app.route('/')
@@ -87,15 +87,10 @@ def run(isDebug, command_queue, system_info_temp):
 def getJson():
     state = OrderedDict([
         ('currentSpeed', system_info.getCurrentSpeed()),
-        ('obstacleDistance', system_info.getObstacleDistance()),
-        #('ticksLeft', system_info.getTicksLeft()),
-        #('ticksRight', system_info.getTicksRight())
-        ('ticsDifference', system_info.getTicksLeft() - system_info.getTicksRight())
-    ])
+        ('obstacleDistance', system_info.getObstacleDistance())])
     settings = OrderedDict([
         ('userSetSpeed', system_info.getUserSetSpeed()),
-        ('safeDistance', system_info.getSafeDistance()),
-        ('alertDistance', system_info.getAlertDistance())
+        ('safeDistance', system_info.getSafeDistance())
     ])
     res = json.dumps({
         "state": state,
@@ -133,11 +128,10 @@ def turn_off():
       after the POST request
     """
     COMMAND_QUEUE.put(commands.TurnOffCommand())
-
-    req = _pool.apply_async(getPower)
-    res = req.get()
+    _pool.apply_async(powerOff)
+    print('POWERRRR', system_info.getPower())
     json = jsonify({
-        "power": res
+        "power": False
     })
     json.status_code = 200
     return json
@@ -170,6 +164,9 @@ def post_settings():
 def getPower():
     return system_info.getPower()
 
+def powerOff():
+    system_info.setPower(False)
+
 
 @app.route('/api/power-status', methods=['GET'])
 def get_power():
@@ -185,16 +182,3 @@ def get_power():
     json.status_code = 200
     return json
 
-
-@app.route('/api/power-status', methods=['POST'])
-def post_power():
-    """
-      handles POST request for setting the power from fetch,
-      since the fetch needs the value of the power status
-      after setting it, we return the power status,
-      and not the render template
-    """
-    dataDict = json.loads(request.data)
-    global power
-    power = dataDict['power']
-    return jsonify(power)

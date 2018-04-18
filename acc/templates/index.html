@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html>
 
 <head>
@@ -180,11 +180,6 @@
       height: 30px;
     }
 
-    table {
-      height: 100%;
-      width: 100%;
-    }
-
     td.td-value {
       text-align: right;
     }
@@ -260,7 +255,7 @@
             </div>
           </div>
           <div class='system-content-item'>
-            <button id='power-switch'></button>
+            <button  class='power-off' id='power-switch'></button>
           </div>
         </div>
       </div>
@@ -290,17 +285,31 @@
     let ts = new Date();
     let timeout;
     let ts_timeout;
+    let power_timeout;
+    let power = false;
+    let info_timeout;
+
+    function setPowerInterval() {
+      power_timeout = setInterval(() => {
+        getPowerStatus().then(resPower => {
+          power = resPower;
+          console.log(power);
+          setPowerDisplay(resPower);
+          if (power) {
+	        getSystemInfo().then(json => {
+	          refreshSettings(json, false);
+	          updateTS(false);
+	          refreshTimestamp();
+	      });
+          } else {
+            clearInterval(power_timeout);
+	  }
+        });
+      }, 1000);
+    };
 
     window.onload = () => {
-      getPowerStatus().then((power) => {
-        setPowerDisplay(power);
-      });
-
-      getSystemInfo().then(json => {
-        refreshSettings(json);
-        updateTS(false);
-        refreshTimestamp();
-      });
+	    setPowerInterval();
     }
   </script>
 
@@ -330,7 +339,7 @@
           "distance": num_distance
         };
 
-        fetch(USER_SETTINGS, {
+        fetch(USER_SETTINGS, { 
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -355,7 +364,7 @@
      */
     refresh.onclick = (event) => {
       getSystemInfo().then(json => {
-        refreshSettings(json);
+        refreshSettings(json, true);
         clearInterval(ts_timeout);
         updateTS(true);
         refreshTimestamp();
@@ -371,10 +380,10 @@
      * pressed again
      */
     power_switch.onclick = (event) => {
-      event.preventDefault();
+      clearInterval(power_timeout);
       fetch(TURN_OFF, {
         method: 'POST'
-      })
+      });
       setPowerDisplay(false);
     }
   </script>
@@ -385,8 +394,9 @@
      *
      * @return {JSON} The system information.
      */
-    const getSystemInfo = () => (
-      fetch(SYSTEM_INFO, {
+    const getSystemInfo = () => {
+      console.log('getting system info');
+      return fetch(SYSTEM_INFO, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -396,7 +406,7 @@
         .catch(err => {
           console.log(err);
         })
-    );
+    };
 
     /**
      * cleans the table of all system information and
@@ -405,17 +415,25 @@
      * @param {JSON} json the JSON Object with the current settings
      *
      */
-    const refreshSettings = (json) => {
+    const refreshSettings = (json, refreshPressed) => {
       while (content.childNodes.length > 4) {
         content.removeChild(content.lastChild);
       }
-      setTimeout(() => {
-        const state = json.state
-        const settings = json.settings;
-        mapJsonToTable(state);
-        tableAddSpace();
-        mapJsonToTable(settings);
-      }, 50);
+      if (refreshPressed) {
+        setTimeout(() => {
+          updateUI(json);
+        }, 50);
+      } else {
+        updateUI(json);
+      }
+    }
+
+    const updateUI = (json) => {
+      const state = json.state
+      const settings = json.settings;
+      mapJsonToTable(state);
+      tableAddSpace();
+      mapJsonToTable(settings);
     }
 
     /**
@@ -453,10 +471,10 @@
     const setPowerDisplay = (power) => {
       if (power) {
         power_switch.className = 'power-off';
-        power_switch.innerHTML = 'Power Off';
+        power_switch.innerText = 'Power Off';
       } else {
         power_switch.className = 'power-on';
-        power_switch.innerHTML = '';
+        power_switch.innerText = '';
       }
     }
 
