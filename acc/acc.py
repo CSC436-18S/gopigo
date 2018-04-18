@@ -35,7 +35,7 @@ USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
 
 class ACC(object):
-    def __init__(self, command_queue, user_set_speed, safe_distance):
+    def __init__(self, system_info, command_queue, user_set_speed, safe_distance):
         """
         Initializes the rover object and sets the values based on the given
         parameters and the current state of the rover.
@@ -47,6 +47,7 @@ class ACC(object):
         :param int safe_distance: The user set safe distance. None will cause a
             reasonable default to be used.
         """
+        self.system_info = system_info
         self.command_queue = command_queue
 
         if user_set_speed is None:
@@ -69,10 +70,19 @@ class ACC(object):
         self.obstacle_distance = None
         self.obstacle_relative_speed = None
 
+        self.t = 0
+
         self.dists = collections.deque(maxlen=SAMPLE_SIZE)
-        self.dts = collections.deque(maxlen=SAMPLE_SIZE)
+        self.dts = collections.deque(maxlen=SAMPLE_SIZE - 1)
 
         # TODO: More
+
+    def __update_system_info(self):
+        self.system_info.userSetSpeed = self.user_set_speed
+        self.system_info.safeDistance = self.safe_distance
+        self.system_info.curentSpeed = self.speed
+        self.system_info.obstacleDistance = self.obstacle_distance
+        self.system_info.power = self.power_on
 
     def run(self):
         """
@@ -170,6 +180,35 @@ class ACC(object):
     def __get_alert_distance(self):
         return self.safe_distance * ALERT_DISTANCE_CONST
 
+    def __calculate_relevant_distances(self):
+        pass
+
+    def __validate_user_settings(self):
+        pass
+
+    def __obstacle_based_acceleration_determination(self, dt):
+        if (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance <= CRITICAL_DISTANCE:
+            print("<= Critical")
+            self.__stop_until_safe_distance()
+            self.speed = 0
+            self.t = time.time()
+        elif self.obstacle_distance <= self.safe_distance:
+            print("<= Safe")
+            if self.speed > STOP_THRESHOLD:
+                #speed = speed - dt * SPEED_DECCELLERATION
+                self.speed = self.speed - dt * get_deccelleration(self.speed)
+            else:
+                self.speed = 0
+        elif self.speed > self.user_set_speed:
+            print("Slowing down")
+            self.speed = self.speed - dt * SLOWING_DECCELLERATION
+        elif self.obstacle_distance <= self.__get_alert_distance() and self.obstacle_relative_speed is not None:
+            self.speed = self.__handle_alert_distance(dt)
+        elif self.speed < self.user_set_speed:
+            print("Speeding up")
+            self.speed = self.speed + dt * SPEED_ACCELERATION
+            #speed = speed - dt * get_deccelleration(speed)
+
     def __main(self):
         #self.speed = INITIAL_SPEED
 
@@ -186,42 +225,27 @@ class ACC(object):
             gopigo.set_speed(0)
             gopigo.fwd()
 
-            t = time.time()
+            self.t = time.time()
             while self.power_on:
+                self.__update_system_info()
+
                 if self.speed < 0:
                     self.speed = 0
 
                 print("========================")
                 self.__process_commands()
 
-                dt = time.time() - t
-                t = time.time()
+                dt = time.time() - self.t
+                self.t = time.time()
 
                 print("Time: " + str(dt))
 
                 self.__observe_obstacle(dt)
+                self.__calculate_relevant_distances()
 
-                if (isinstance(self.obstacle_distance, str) and self.obstacle_distance != NOTHING_FOUND) or self.obstacle_distance < CRITICAL_DISTANCE:
-                    print("< Critical")
-                    self.__stop_until_safe_distance()
-                    self.speed = 0
-                    t = time.time()
-                elif self.obstacle_distance < self.safe_distance:
-                    print("< Safe")
-                    if self.speed > STOP_THRESHOLD:
-                        #speed = speed - dt * SPEED_DECCELLERATION
-                        self.speed = self.speed - dt * get_deccelleration(self.speed)
-                    else:
-                        self.speed = 0
-                elif self.speed > self.user_set_speed:
-                    print("Slowing down")
-                    self.speed = self.speed - dt * SLOWING_DECCELLERATION
-                elif self.obstacle_distance < self.__get_alert_distance() and self.obstacle_relative_speed is not None:
-                    self.speed = self.__handle_alert_distance(dt)
-                elif self.speed < self.user_set_speed:
-                    print("Speeding up")
-                    self.speed = self.speed + dt * SPEED_ACCELERATION
-                    #speed = speed - dt * get_deccelleration(speed)
+                self.__validate_user_settings()
+
+                self.__obstacle_based_acceleration_determination(dt)
 
                 elapsed_ticks_left, elapsed_ticks_right = \
                     read_enc_ticks(self.initial_ticks_left, self.initial_ticks_right)
@@ -315,10 +339,9 @@ def calculate_relative_speed(dists, dts):
     old_dist = sum(list(dists)[0:len(dists) / 2]) / (len(dists) / 2)
     new_dist = sum(list(dists)[len(dists) / 2:]) / (len(dists) / 2)
 
-    old_dt = sum(list(dts)[0:len(dts) / 2])
-    new_dt = sum(list(dts)[len(dts) / 2:])
+    avg_dt = sum(list(dts)) / len(dts)
 
-    rel_speed = (new_dist - old_dist) / ((new_dt + old_dt) / 2.0)
+    rel_speed = (new_dist - old_dist) / avg_dt
 
     return rel_speed
 
