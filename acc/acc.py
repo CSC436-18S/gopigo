@@ -99,9 +99,6 @@ class ACC(object):
 
         self.system_info.setPower(self.power_on)
 
-        # TODO: Add more values
-        # Voltage
-
     def run(self):
         """
         Starts the acc to control the rover.
@@ -118,7 +115,9 @@ class ACC(object):
         # Print out the battery voltage so that we can make sure the that
         # the batteries are not low
         time.sleep(0.1)
-        print("Volt: " + str(gopigo.volt()))
+        volt = gopigo.volt()
+        print("Volt: " + str(volt))
+        self.system_info.setStartupVoltage(volt)
 
         time.sleep(0.1)
         self.initial_ticks_left = gopigo.enc_read(gopigo.LEFT)
@@ -230,11 +229,13 @@ class ACC(object):
             self.obstacle_distance != NOTHING_FOUND) or \
             self.obstacle_distance <= self.critical_distance:
             print("<= Critical")
+            self.system_info.setSafetyRange("Critical")
             self.__stop_until_safe_distance()
             self.speed = 0
             self.t = time.time()
         elif self.obstacle_distance <= self.safe_distance:
             print("<= Safe")
+            self.system_info.setSafetyRange("Safe")
             #if self.speed > STOP_THRESHOLD:
                 #speed = speed - dt * SPEED_DECCELLERATION
             #    self.speed = self.speed - dt * self.__get_deccelleration()
@@ -257,11 +258,13 @@ class ACC(object):
             self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
         elif self.speed > self.user_set_speed:
             print("Slowing down")
+            self.system_info.setSafetyRange("Slowing")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
         #elif self.obstacle_distance <= self.alert_distance:
             print("In Alert")
+            self.system_info.setSafetyRange("Alert")
             print("Prev speed: " + str(self.speed))
             acceleration = self.__velocity_to_power(
                 (1.0 / (TIMESTEPS_TO_APPROACH_SD)) * ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
@@ -274,6 +277,7 @@ class ACC(object):
             #self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
             print("Speeding up")
+            self.system_info.setSafetyRange("Speeding")
             self.speed = self.speed + dt * SPEED_ACCELERATION
             #speed = speed - dt * get_deccelleration(speed)
 

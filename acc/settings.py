@@ -1,14 +1,18 @@
+UNKNOWN = "-"
+
 class SystemInfo():
     def __init__(self):
-        self.currentSpeed = 0
-        self.obstacleDistance = 9999
-        self.ticksLeft = 0
-        self.ticksRight = 0
+        self.currentSpeed = UNKNOWN
+        self.obstacleDistance = UNKNOWN
+        self.ticksLeft = UNKNOWN
+        self.ticksRight = UNKNOWN
+        self.safetyRange = UNKNOWN
+        self.startupVoltage = UNKNOWN
 
-        self.userSetSpeed = 0
-        self.safeDistance = 9999
-        self.criticalDistance = 0
-        self.alertDistance = 0
+        self.userSetSpeed = UNKNOWN
+        self.safeDistance = UNKNOWN
+        self.criticalDistance = UNKNOWN
+        self.alertDistance = UNKNOWN
 
         self.power = True
 
@@ -39,6 +43,12 @@ class SystemInfo():
     def getTicksRight(self):
         return self.ticksRight
 
+    def getSafetyRange(self):
+        return self.safetyRange
+
+    def getStartupVoltage(self):
+        return self.startupVoltage
+
     def setPower(self, power):
         self.power = power
 
@@ -65,3 +75,9 @@ class SystemInfo():
 
     def setTicksRight(self, ticks):
         self.ticksRight = ticks
+
+    def setSafetyRange(self, s_range):
+        self.safetyRange = s_range
+
+    def setStartupVoltage(self, volt):
+        self.startupVoltage = volt
