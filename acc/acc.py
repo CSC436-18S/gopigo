@@ -15,11 +15,11 @@ MIN_SPEED = 30
 
 INC_CONST = 100.0 #100.0
 
-CRITICAL_DISTANCE = 10
-SAFE_DISTANCE = 2 * CRITICAL_DISTANCE
+CRITICAL_DISTANCE_MIN = 8
+#SAFE_DISTANCE = 2 * CRITICAL_DISTANCE
 #ALERT_DISTANCE = 5 * SAFE_DISTANCE
-ALERT_DISTANCE_CONST = 3
-SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
+#ALERT_DISTANCE_CONST = 3
+#SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
 
 BUFFER_DISTANCE = 10 # cm
 TIMESTEPS_TO_APPROACH_SD = 10
@@ -130,6 +130,9 @@ class ACC(object):
     def __power_to_velocity(self, power):
         return 0.192 * power
 
+    def __velocity_to_power(self, velocity):
+        return float(velocity) / 0.192
+
     def __process_commands(self):
         if not self.command_queue.empty():
             command = self.command_queue.get()
@@ -202,11 +205,9 @@ class ACC(object):
             return self.speed
 
     def __calculate_relevant_distances(self, dt):
-        self.critical_distance = CRITICAL_DISTANCE
-        #self.critical_distance = 10 * (self.speed / float(MAX_SPEED))
+        self.critical_distance = CRITICAL_DISTANCE_MIN + 7 * (self.speed / float(MAX_SPEED))
         self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISTANCE
 
-        #self.alert_distance = self.safe_distance * ALERT_DISTANCE_CONST
         if self.obstacle_relative_speed is not None:
             self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
         else:
@@ -233,19 +234,19 @@ class ACC(object):
             self.t = time.time()
         elif self.obstacle_distance <= self.safe_distance:
             print("<= Safe")
-            #if self.speed > STOP_THRESHOLD:
+            if self.speed > STOP_THRESHOLD:
                 #speed = speed - dt * SPEED_DECCELLERATION
-            #    self.speed = self.speed - dt * get_deccelleration(self.speed)
-            #else:
-            #    self.speed = 0
-            self.speed = self.speed + (self.__power_to_velocity(self.obstacle_distance - self.safe_distance) / dt)
+                self.speed = self.speed - dt * self.__get_deccelleration()
+            else:
+                self.speed = 0
+            #self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
             self.speed = self.__handle_alert_distance(dt)
-            #self.speed = self.speed + ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt))
+            #self.speed = self.speed + (self.__velocity_to_power((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
         elif self.speed < self.user_set_speed:
             print("Speeding up")
             self.speed = self.speed + dt * SPEED_ACCELERATION
@@ -287,12 +288,22 @@ class ACC(object):
             gopigo.set_left_speed(0)
             gopigo.set_right_speed(0)
 
+    def __get_deccelleration(self):
+        """
+        Returns the deccelleration amount to use when slowing down when within the
+        safe distance.
+    
+        It is based on the current speed so that at higher speeds it decelerates
+        more, and at lower speeds it deccellerates less.
+    
+        :param float speed: The current speed that the rover is going (power units)
+        :return: The deccelleration to apply to the rover's speed (power units / seconds)
+        :rtype: float
+        """
+        slowdown_span = (4.0/ 5.0) * (self.safe_distance - self.critical_distance)
+        return (self.speed ** 2.0) / (2.0 * slowdown_span)
+
     def __main(self):
-        #print("Critical: " + str(CRITICAL_DISTANCE))
-        #print("Safe:     " + str(self.safe_distance))
-        #print("Alert:    " + str(self.alert_distance))
-
-
         try:
             gopigo.set_speed(0)
             gopigo.fwd()
@@ -346,20 +357,6 @@ def get_inc(speed):
     else:
         #return (9.0 / (speed / INC_CONST)) / 1.5
         return 2.0 * (9.0 / (speed / INC_CONST)) / 1.5
-
-def get_deccelleration(speed):
-    """
-    Returns the deccelleration amount to use when slowing down when within the
-    safe distance.
-
-    It is based on the current speed so that at higher speeds it decelerates
-    more, and at lower speeds it deccellerates less.
-
-    :param float speed: The current speed that the rover is going (power units)
-    :return: The deccelleration to apply to the rover's speed (power units / seconds)
-    :rtype: float
-    """
-    return (speed ** 2.0) / (2.0 * SLOWDOWN_SPAN)
 
 def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     time.sleep(0.01)
