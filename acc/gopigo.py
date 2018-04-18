@@ -1,3 +1,12 @@
+###############################################
+# These functions have been modified from the gopigo library (GPLv3) in order
+# to remove some of the extra time.sleep times, so that the main loop can run
+# at a faster rate.
+#
+# For the ACC, the running rate of the main loop can greatly impact the
+# performance as slower rates lead to slower response times.
+###############################################
+
 import time
 import smbus
 
@@ -18,6 +27,10 @@ US_CMD = [117]
 set_left_speed_cmd = [70]
 set_right_speed_cmd = [71]
 motor_fwd_cmd = [105]
+trim_write_cmd = [31]
+ENC_READ_CMD = [53]
+volt_cmd = [118]
+stop_cmd = [120]
 
 def write_i2c_block(address, block):
     try:
@@ -41,6 +54,120 @@ def enc_read(motor):
         return v
     else:
         return None
+
+#Set speed of the both motors
+#   arg:
+#       speed-> 0-255
+def set_speed(speed):
+    """
+    Sets the speed of the left and right motors to the given speed. The speed
+    should be in the range of [0, 255].
+
+    Sleeps for 0.1 seconds in between setting the left and right motor speeds.
+
+    :param int speed: The speed to set the motors to. [0, 255]
+    """
+    if speed >255:
+        speed =255
+    elif speed <0:
+        speed =0
+    set_left_speed(speed)
+    #time.sleep(.1)
+    set_right_speed(speed)
+
+#Set speed of the left motor
+#   arg:
+#       speed-> 0-255
+def set_left_speed(speed):
+    """
+    Sets the speed of the left motor. The speed should be in the range of
+    [0, 255].
+
+    Returns -1 if the motor speed change fails.
+
+    :param int speed: The speed to set the left motor to. [0, 255]
+    :return: A value indicating if the setting suceeded.
+    :rtype: int
+    """
+    if speed >255:
+        speed =255
+    elif speed <0:
+        speed =0
+    return write_i2c_block(ADDRESS,set_left_speed_cmd+[speed,0,0])
+
+#Set speed of the right motor
+#   arg:
+#       speed-> 0-255
+def set_right_speed(speed):
+    """
+    Sets the speed of the right motor. The speed should be in the range of
+    [0, 255].
+
+    Returns -1 if the motor speed change fails.
+
+    :param int speed: The speed to set the right motor to. [0, 255]
+    :return: A value indicating if the setting suceeded.
+    :rtype: int
+    """
+    if speed >255:
+        speed =255
+    elif speed <0:
+        speed =0
+    return write_i2c_block(ADDRESS,set_right_speed_cmd+[speed,0,0])
+
+#Write the trim value to EEPROM, where -100=0 and 100=200
+def trim_write(value):
+    if value>100:
+        value=100
+    elif value<-100:
+        value=-100
+    value+=100
+    write_i2c_block(ADDRESS,trim_write_cmd+[value,0,0])
+
+#Read voltage
+#   return: voltage in V
+def volt():
+    write_i2c_block(ADDRESS,volt_cmd+[0,0,0])
+    time.sleep(.1)
+    try:
+        b1=bus.read_byte(ADDRESS)
+        b2=bus.read_byte(ADDRESS)
+    except IOError:
+        return -1
+
+    if b1!=-1 and b2!=-1:
+        v=b1*256+b2
+        v=(5*float(v)/1024)/0.4
+        return round(v,2)
+    else:
+        return -1
+
+def enc_read(motor):
+    write_i2c_block(ADDRESS, ENC_READ_CMD+[motor, 0, 0])
+    #time.sleep(0.01)
+    #time.sleep(0.08)
+    try:
+        b1 = BUS.read_byte(ADDRESS)
+        b2 = BUS.read_byte(ADDRESS)
+    except IOError:
+        return -1
+    if b1 != -1 and b2 != -1:
+        v = b1 * 256 + b2
+        return v
+    else:
+        return -1
+
+#Stop the GoPiGo
+def stop():
+    """
+    Brings the GoPiGo to a full stop.
+
+    Returns -1 if the action fails.
+
+    :return: A value indicating if the action suceeded.
+    :rtype: int
+    """
+    return write_i2c_block(ADDRESS,stop_cmd+[0,0,0])
 
 def fwd(dist=0): #distance is in cm
     """
