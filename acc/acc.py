@@ -7,6 +7,8 @@ import traceback
 import smbus
 import gopigo
 
+import commands
+
 TRIM = 0#5#0
 INITIAL_SPEED = 50
 MAX_SPEED = 150 #200
@@ -30,13 +32,6 @@ ALERT_THRESHOLD = 5.0 # 0.01
 USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
 
-###############################################
-# These functions have been modified from the gopigo library (GPLv3) in order
-# to remove some of the extra time.sleep times, so that the main loop can run
-# at a faster rate.
-#
-# For the ACC, the running rate of the main loop can greatly impact the
-# performance as slower rates lead to slower response times.
 
 ADDRESS = 0x08
 ENC_READ_CMD = [53]
@@ -137,6 +132,9 @@ def main(command_queue):
 
     print("Initial\tL: " + str(initial_ticks_left) + "\tR: " + str(initial_ticks_right))
 
+    global SAFE_DISTANCE
+    global MAX_SPEED
+
     print("Critical: " + str(CRITICAL_DISTANCE))
     print("Safe:     " + str(SAFE_DISTANCE))
     print("Alert:    " + str(ALERT_DISTANCE))
@@ -157,8 +155,22 @@ def main(command_queue):
                 speed = 0
 
             print("========================")
-            #if not command_queue.empty():
-            #    comm = command_queue.get()
+            if not command_queue.empty():
+                command = command_queue.get()
+                if isinstance(command, commands.ChangeSettingsCommand):
+                    if command.userSetSpeed is not None:
+                        MAX_SPEED = command.userSetSpeed
+                    else:
+                        pass # TODO
+
+                    if command.safeDistance is not None:
+                        SAFE_DISTANCE = command.safeDistance
+                    else:
+                        pass # TODO
+
+                if isinstance(command, commands.TurnOffCommand):
+                    break
+
             #    global MAX_SPEED
             #    global SAFE_DISTANCE
             #    MAX_SPEED = comm[0]
