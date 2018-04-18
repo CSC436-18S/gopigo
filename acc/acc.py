@@ -336,9 +336,6 @@ class ACC(object):
             while self.power_on:
                 self.__update_system_info()
 
-                if self.speed < 0:
-                    self.speed = 0
-
                 print("========================")
                 self.__process_commands()
 
@@ -353,6 +350,12 @@ class ACC(object):
                 self.__validate_user_settings()
 
                 self.__obstacle_based_acceleration_determination(dt)
+
+                if self.speed < 0:
+                    self.speed = 0
+
+                if self.user_set_speed < MIN_SPEED:
+                    self.speed = 0
 
                 l_diff, r_diff = self.__straightness_correction()
 
