@@ -22,7 +22,7 @@ CRITICAL_DISTANCE_MIN = 8
 #SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
 
 BUFFER_DISTANCE = 10 # cm
-TIMESTEPS_TO_APPROACH_SD = 10
+TIMESTEPS_TO_APPROACH_SD = 20
 
 SLOWING_DECCELLERATION = 50#100 # power units / second
 SPEED_ACCELERATION = 40#100 # power units / second
@@ -128,7 +128,7 @@ class ACC(object):
             str(self.initial_ticks_right))
 
     def __power_to_velocity(self, power):
-        return 0.192 * power
+        return float(power) * 0.192
 
     def __velocity_to_power(self, velocity):
         return float(velocity) / 0.192
@@ -234,19 +234,43 @@ class ACC(object):
             self.t = time.time()
         elif self.obstacle_distance <= self.safe_distance:
             print("<= Safe")
-            if self.speed > STOP_THRESHOLD:
+            #if self.speed > STOP_THRESHOLD:
                 #speed = speed - dt * SPEED_DECCELLERATION
-                self.speed = self.speed - dt * self.__get_deccelleration()
-            else:
-                self.speed = 0
-            #self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
+            #    self.speed = self.speed - dt * self.__get_deccelleration()
+            #else:
+            #    self.speed = 0
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            print("SAFE")
+            self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
-            self.speed = self.__handle_alert_distance(dt)
-            #self.speed = self.speed + (self.__velocity_to_power((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
+        #elif self.obstacle_distance <= self.alert_distance:
+            print("In Alert")
+            print("Prev speed: " + str(self.speed))
+            acceleration = self.__velocity_to_power(
+                (1.0 / (TIMESTEPS_TO_APPROACH_SD)) * ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
+            self.speed = self.speed + acceleration
+            print("Acceleration: " + str(acceleration))
+
+            print("Alert distance:" + str(self.alert_distance))
+            print("Safe distance:" + str(self.safe_distance))
+
+            #self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
             print("Speeding up")
             self.speed = self.speed + dt * SPEED_ACCELERATION
@@ -335,6 +359,7 @@ class ACC(object):
                 self.__actualize_power(l_diff, r_diff)
 
                 print("Speed: " + str(self.speed))
+                print("Speed (cm/s): " + str(self.__power_to_velocity(self.speed)))
 
         except (KeyboardInterrupt, Exception):
             traceback.print_exc()
@@ -369,12 +394,24 @@ def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     return (elapsed_ticks_left, elapsed_ticks_right)
 
 def calculate_relative_speed(dists, dts):
+    #print("Dists: " + str(dists))
+    #print("Dts: " + str(dts))
+
     old_dist = sum(list(dists)[0:len(dists) / 2]) / (len(dists) / 2)
     new_dist = sum(list(dists)[len(dists) / 2:]) / (len(dists) / 2)
 
+    #print("old_dist: " + str(old_dist))
+    #print("new_dist: " + str(new_dist))
+
     avg_dt = sum(list(dts)) / len(dts)
 
-    rel_speed = (new_dist - old_dist) / avg_dt
+    #print("avg_dt: " + str(avg_dt))
+
+    #print("diff: " + str(new_dist - old_dist))
+
+    #print("divider: " + str(len(dists) / 2.0 - 2))
+
+    rel_speed = (new_dist - old_dist) / ((len(dists) / 2.0 - 1) * avg_dt)
 
     return rel_speed
 
