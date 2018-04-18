@@ -79,12 +79,15 @@ class ACC:
         """
         This function enacts the primary functionality of the ACC, as outlined by the "Main Diagram" sequence diagram.
         """
+        print("run")
         prev_time = time.time()
         while self.power_on:
+            print("user set speed: " + str(self.user_set_speed))
             self.process_commands()
             if not self.power_on:
                 break
             dt = time.time() - prev_time
+            print("delta time:\t" + str(dt))
             prev_time = time.time()
             self.determine_safety_values(dt)
             self.validate_user_settings()
@@ -92,7 +95,7 @@ class ACC:
             self.velocity_to_power_calculation(dt)
             self.actualize_power()
 
-        self.power_off(prev_time)
+        #self.power_off(prev_time)
 
 
     def process_commands(self):
@@ -102,7 +105,7 @@ class ACC:
         """
         if not self.command_queue.empty():
             command = self.command_queue.get()
-            if instanceof(command, commands.ChangeSettingsCommand):
+            if isinstance(command, commands.ChangeSettingsCommand):
                 if command.userSetSpeed is not None:
                     self.user_set_speed = command.userSetSpeed
                 else:
@@ -114,21 +117,25 @@ class ACC:
                 else:
                     self.safe_distance = gopigo.us_dist(gopigo.USS)
 
-            elif instanceof(command, commands.TurnOffCommand):
+            elif isinstance(command, commands.TurnOffCommand):
                 self.power_on = False
+
+        #self.print_values()
 
 
     def determine_safety_values(self, dt):
         #TODO: May need to determine rotation rates in a more clever manner than simple time differentials
         self.right_rotation_rate = (gopigo.enc_read(gopigo.RIGHT) - self.elapsed_ticks_right)/dt
         self.left_rotation_rate = (gopigo.enc_read(gopigo.LEFT) - self.elapsed_ticks_left)/dt
-
+        
         self.caculate_current_speed()
         self.observe_obstacle(dt)
         self.critical_distance = (MAX_STOPPING_DISTANCE/MAX_POWER_VALUE)*max(self.current_speed_left, self.current_speed_right)
         self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISATANCE
         self.alert_distance = self.safe_distance + max(self.current_speed_left, self.current_speed_right)*SLOWDOWN_TIME
         self.perform_obstalce_based_acceleratioin_determination(dt)
+
+        #self.print_values()
 
 
     def caculate_current_speed(self):
@@ -185,7 +192,7 @@ class ACC:
     def validate_user_settings(self):
         if self.user_set_speed is not None:
             if self.user_set_speed > self.safe_speed:
-                self.set_speed = self.safe_speed
+              self.power_on = True
             else:
                 self.set_speed = self.user_set_speed
 
@@ -194,6 +201,8 @@ class ACC:
                 self.set_distance = self.minimum_settable_safe_distance
             else:
                 self.set_distance = self.safe_distance
+        
+        #self.print_values()
 
 
     def straightness_correction_calculation(self, dt):
@@ -205,6 +214,8 @@ class ACC:
                 self.increase_l_rotation_rate(delta_ticks, dt)
             elif self.elapsed_ticks_right < self.elapsed_ticks_left:
                 self.increase_r_rotation_rate(delta_ticks, dt)
+
+        #self.print_values()
 
 
     def calculate_elapsed_ticks(self):
@@ -277,6 +288,8 @@ class ACC:
         if self.right_power > MAX_POWER_VALUE:
             self.right_power = MAX_POWER_VALUE
 
+        #self.print_values()
+
 
     def actualize_power(self):
         if self.stop:
@@ -288,6 +301,8 @@ class ACC:
             gopigo.set_left_speed(int(self.left_power))
             gopigo.set_right_speed(int(self.right_power))
 
+        self.print_values()
+
 
     def power_off(self, prev_time):
         while self.obstacle_distance <= self.minimum_settable_safe_distance:
@@ -298,3 +313,37 @@ class ACC:
             self.validate_user_settings()
             self.straightness_correction_calculation(dt)
             self.velocity_to_power_calculation(dt)
+
+        #self.print_values()
+
+
+    def print_values(self):
+        print("power on:\t" + str(self.power_on))
+        print("stop:\t" + str(self.stop))
+        print("e.t.l.:\t" + str(self.elapsed_ticks_left))
+        print("e.t.l.:\t" + str(self.elapsed_ticks_right))
+        print("alert dist:\t" + str(self.alert_distance))
+        print("crit. dist:\t" + str(self.critical_distance))
+        print("curr. acc:\t" + str(self.current_acceleration))
+        print("curr. speed L:\t" + str(self.current_speed_left))
+        print("curr. speed R:\t" + str(self.current_speed_right))
+        print("safe speed:\t" + str(self.safe_speed))
+        print("left power:\t" + str(self.left_power))
+        print("right power:\t" + str(self.right_power))
+        print("rot. rate L:\t" + str(self.left_rotation_rate))
+        print("rot. rate R:\t" + str(self.right_rotation_rate))
+        print("min. safe dist.:\t" + str(self.minimum_settable_safe_distance))
+        print("delta ticks L:\t" + str(self.delta_ticks_l))
+        print("delta ticks R:\t" + str(self.delta_ticks_r))
+        print("obs. dist.:\t" + str(self.obstacle_distance))
+        print("obs. vel.:\t"  + str(self.obstacle_velocity))
+        print("obs. acc.:\t"  + str(self.obstacle_acceleration))
+        print("prev. ach. v L:\t" + str(self.prev_achieved_v_l))
+        print("prev. ach. v R:\t" + str(self.prev_achieved_v_r))
+        print("set speed:\t" + str(self.set_speed))
+        print("set dist.:\t" + str(self.set_distance))
+        print("desired v L:\t" + str(self.v_desired_left))
+        print("desired v R:\t" + str(self.v_desired_right))
+        print("v path L:\t" + str(self.v_path_left))
+        print("v path R:\t" + str(self.v_path_right))
+        

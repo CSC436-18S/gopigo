@@ -17,10 +17,11 @@ bus = smbus.SMBus(1)
 US_CMD = [117]
 set_left_speed_cmd = [70]
 set_right_speed_cmd = [71]
+motor_fwd_cmd = [105]
 
 def write_i2c_block(address, block):
     try:
-        op = bus.write_i2c_block_data(address, 1, block)
+        op = bus.write_i2c_block_data(ADDRESS, 1, block)
         time.sleep(0.005)
         return op
     except IOError:
@@ -60,7 +61,7 @@ def fwd(dist=0): #distance is in cm
     except Exception as e:
         print ("gopigo fwd: {}".format(e))
         pass
-    return write_i2c_block(address,motor_fwd_cmd+[0,0,0])
+    return write_i2c_block(ADDRESS,motor_fwd_cmd+[0,0,0])
 
 def us_dist(pin):
     write_i2c_block(ADDRESS, US_CMD+[pin,0,0])

@@ -13,6 +13,10 @@ from collections import OrderedDict
 
 from settings import SystemInfo
 
+import multiprocessing
+
+import commands
+
 """
   used to grab correct network interface from for the hostname
   instead of localhost, which allows for mobile device connection
@@ -36,6 +40,9 @@ app = Flask(__name__)
 api = Api(app)
 CORS(app)
 PORT = 8080
+
+COMMAND_QUEUE = None
+
 """
   wlp2s0 is more standard version then wlan0 and eth0,
   if wlp2s0 cannot be found, default to wlan0
@@ -64,7 +71,10 @@ def index():
 """
   function that handles starting the application on port 8080
 """
-def run(isDebug):
+def run(isDebug, command_queue):
+  global COMMAND_QUEUE
+  COMMAND_QUEUE = command_queue
+
   app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
 
 """
@@ -96,6 +106,9 @@ def get_settings():
 @app.route('/api/turn-off', methods=['POST'])
 def turn_off():
   system_info.setPower(False)
+
+  COMMAND_QUEUE.put(commands.TurnOffCommand())
+
   return json.dumps(system_info.__dict__)
 
 
@@ -112,6 +125,9 @@ def post_settings():
   distance = dataDict['distance']
   system_info.setUserSetSpeed(speed)
   system_info.setSafeDistance(distance)
+
+  COMMAND_QUEUE.put(commands.ChangeSettingsCommand(speed, distance))
+
   return json.dumps(system_info.__dict__)
 
 

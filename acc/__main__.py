@@ -5,10 +5,14 @@ Running this module will start up the ACC and run the webserver for the user
 interface.
 """
 
+import os.path
 import multiprocessing
+import time
 
 import acc
 import api
+
+LOCK_FILE = "lock.txt"
 
 def main():
     """
@@ -19,10 +23,19 @@ def main():
 
     listener_process = multiprocessing.Process(target=api.run, args=(True, command_queue))
 
+    #listener_process = api.test(command_queue)
+
     listener_process.start()
 
+    #listen_pid = listener_process.pid
+
+    #print(str(os.getpid()) + " <> " + str(listen_pid))
+
+    #if os.getpid() != listen_pid:
     acc_instance = acc.ACC(command_queue, 150, 80)
     acc_instance.run()
 
 if __name__ == "__main__":
+    #if not os.path.isfile(LOCK_FILE):
+    #    open(LOCK_FILE, "a").close()
     main()
