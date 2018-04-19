@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import collections
+import math
 import time
 import traceback
 
@@ -104,6 +105,11 @@ class ACC(object):
         self.system_info.setAlertDistance(int(self.alert_distance))
 
         self.system_info.setPower(self.power_on)
+
+        if isinstance(self.obstacle_relative_speed, str):
+            self.system_info.setObstacleRelSpeed(self.obstacle_relative_speed)
+        elif self.obstacle_relative_speed is not None:
+            self.system_info.setObstacleRelSpeed(int(math.floor(self.obstacle_relative_speed)))
 
     def run(self):
         """

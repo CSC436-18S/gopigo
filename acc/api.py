@@ -88,6 +88,7 @@ def getJson():
     state = OrderedDict([
         ('currentSpeed', system_info.getCurrentSpeed()),
         ('obstacleDistance', system_info.getObstacleDistance()),
+        ('obstacleRelSpeed', system_info.getObstacleRelSpeed()),
         ('tickDifference', system_info.getTicksLeft() - system_info.getTicksRight()),
         ('safetyRange', system_info.getSafetyRange()),
         ('startupVoltage', system_info.getStartupVoltage())

@@ -4,6 +4,7 @@ class SystemInfo():
     def __init__(self):
         self.currentSpeed = UNKNOWN
         self.obstacleDistance = UNKNOWN
+        self.obstacleRelSpeed = UNKNOWN
         self.ticksLeft = UNKNOWN
         self.ticksRight = UNKNOWN
         self.safetyRange = UNKNOWN
@@ -37,6 +38,9 @@ class SystemInfo():
     def getObstacleDistance(self):
         return self.obstacleDistance
 
+    def getObstacleRelSpeed(self):
+        return self.obstacleRelSpeed
+
     def getTicksLeft(self):
         return self.ticksLeft
 
@@ -69,6 +73,9 @@ class SystemInfo():
 
     def setObstacleDistance(self, distance):
         self.obstacleDistance = distance
+
+    def setObstacleRelSpeed(self, speed):
+        self.obstacleRelSpeed = speed
 
     def setTicksLeft(self, ticks):
         self.ticksLeft = ticks
