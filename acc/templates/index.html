@@ -178,10 +178,12 @@
       padding: 0 5px;
       line-height: 1;
       height: 30px;
+      display: none;
     }
 
     td.td-value {
       text-align: right;
+      width: 50pt;
     }
 
     @media screen and (max-width: 400px) {
@@ -245,7 +247,7 @@
             <div id='system-info'>
               <table>
                 <tbody id='table-info'>
-                  <tr>
+                  <tr style="display: none;">
                     <td>Last Updated</td>
                     <td class='td-value' id='table-timestamp'></td>
                   </tr>
