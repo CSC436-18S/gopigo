@@ -25,8 +25,8 @@ CRITICAL_DISTANCE_MIN = 12
 MODE_SAFE_OLD = True
 MODE_ALERT_OLD = True
 
-DYNAMIC_ALERT_DISTANCE = False
-ALERT_DISTANCE_OFFSET = 30
+DYNAMIC_ALERT_DISTANCE = True
+ALERT_DISTANCE_OFFSET = 40
 
 BUFFER_DISTANCE = 10 # cm
 TIMESTEPS_TO_APPROACH_SD = 20
@@ -222,9 +222,9 @@ class ACC(object):
 
         if DYNAMIC_ALERT_DISTANCE:
             if self.obstacle_relative_speed is not None:
-                self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
+                self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
             else:
-                self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * self.speed
+                self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * self.speed
         else:
             self.alert_distance = self.safe_distance + ALERT_DISTANCE_OFFSET
 
@@ -270,7 +270,6 @@ class ACC(object):
             print("Prev speed: " + str(self.speed))
             acceleration = self.__velocity_to_power(
                 (1.0 / (TIMESTEPS_TO_APPROACH_SD)) * ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
-            self.speed = self.speed + acceleration
             print("Acceleration: " + str(acceleration))
 
             print("Alert distance:" + str(self.alert_distance))
@@ -278,6 +277,8 @@ class ACC(object):
 
             if MODE_ALERT_OLD:
                 self.speed = self.__handle_alert_distance(dt)
+            else:
+                self.speed = self.speed + acceleration
         elif self.speed < self.user_set_speed:
             print("Speeding up")
             self.system_info.setSafetyRange("Speeding")
