@@ -23,9 +23,6 @@ INC_CONST = 10          # The power difference to apply to compensate for the ro
 CRITICAL_DISTANCE_MIN = 12  # The minimum critical distance to allow. This should be sufficient to allow the rover to
                             # stop at most speeds. (cm)
 
-MODE_SAFE_OLD = True
-MODE_ALERT_OLD = True
-
 BUFFER_DISTANCE = 10            # A distance from the critical distance to use in calculating the minimum settable safe
                                 # distance (cm)
 
@@ -325,13 +322,10 @@ class ACC(object):
             self.t = time.time()
         elif self.obstacle_distance <= self.safe_distance:
             self.system_info.setSafetyRange("Safe")
-            if MODE_SAFE_OLD:
-                if self.speed > STOP_THRESHOLD:
-                    self.speed = self.speed - dt * self.__get_deceleration()
-                else:
-                    self.speed = 0
+            if self.speed > STOP_THRESHOLD:
+                self.speed = self.speed - dt * self.__get_deceleration()
             else:
-                self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
+                self.speed = 0
         elif self.speed > self.user_set_speed:
             self.system_info.setSafetyRange("Slowing")
             self.speed = self.speed - dt * SLOWING_DECELERATION
@@ -339,12 +333,7 @@ class ACC(object):
             self.obstacle_relative_speed is not None:
             self.system_info.setSafetyRange("Alert")
 
-            if MODE_ALERT_OLD:
-                self.speed = self.__handle_alert_distance(dt)
-            else:
-                acceleration = self.__velocity_to_power(
-                    (1.0 / TIMESTEPS_TO_APPROACH_SD) * ((self.alert_distance - self.safe_distance) / (TIMESTEPS_TO_APPROACH_SD * dt)))
-                self.speed = self.speed + acceleration
+            self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
             self.system_info.setSafetyRange("Speeding")
             self.speed = self.speed + dt * SPEED_ACCELERATION
