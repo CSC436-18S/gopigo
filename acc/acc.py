@@ -15,11 +15,17 @@ MIN_SPEED = 30
 
 INC_CONST = 100.0 #100.0
 
-CRITICAL_DISTANCE_MIN = 8
+CRITICAL_DISTANCE_MIN = 12
 #SAFE_DISTANCE = 2 * CRITICAL_DISTANCE
 #ALERT_DISTANCE = 5 * SAFE_DISTANCE
 #ALERT_DISTANCE_CONST = 3
 #SLOWDOWN_SPAN = (4.0/ 5.0) * (SAFE_DISTANCE - CRITICAL_DISTANCE)
+
+MODE_SAFE_OLD = True
+MODE_ALERT_OLD = True
+
+DYNAMIC_ALERT_DISTANCE = False
+ALERT_DISTANCE_OFFSET = 30
 
 BUFFER_DISTANCE = 10 # cm
 TIMESTEPS_TO_APPROACH_SD = 20
@@ -208,10 +214,13 @@ class ACC(object):
         self.critical_distance = CRITICAL_DISTANCE_MIN + 7 * (self.speed / float(MAX_SPEED))
         self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISTANCE
 
-        if self.obstacle_relative_speed is not None:
-            self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
+        if DYNAMIC_ALERT_DISTANCE:
+            if self.obstacle_relative_speed is not None:
+                self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
+            else:
+                self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * self.speed
         else:
-            self.alert_distance = TIMESTEPS_TO_APPROACH_SD * dt * self.speed
+            self.alert_distance = self.safe_distance + ALERT_DISTANCE_OFFSET
 
         print("Critical: " + str(self.critical_distance))
         print("Minimum: " + str(self.minimum_settable_safe_distance))
@@ -236,33 +245,20 @@ class ACC(object):
         elif self.obstacle_distance <= self.safe_distance:
             print("<= Safe")
             self.system_info.setSafetyRange("Safe")
-            #if self.speed > STOP_THRESHOLD:
-                #speed = speed - dt * SPEED_DECCELLERATION
-            #    self.speed = self.speed - dt * self.__get_deccelleration()
-            #else:
-            #    self.speed = 0
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            print("SAFE")
-            self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
+            if MODE_SAFE_OLD:
+                if self.speed > STOP_THRESHOLD:
+                    #speed = speed - dt * SPEED_DECCELLERATION
+                    self.speed = self.speed - dt * self.__get_deccelleration()
+                else:
+                    self.speed = 0
+            else:
+                self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
         elif self.speed > self.user_set_speed:
             print("Slowing down")
             self.system_info.setSafetyRange("Slowing")
             self.speed = self.speed - dt * SLOWING_DECCELLERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
-        #elif self.obstacle_distance <= self.alert_distance:
             print("In Alert")
             self.system_info.setSafetyRange("Alert")
             print("Prev speed: " + str(self.speed))
@@ -274,13 +270,15 @@ class ACC(object):
             print("Alert distance:" + str(self.alert_distance))
             print("Safe distance:" + str(self.safe_distance))
 
-            #self.speed = self.__handle_alert_distance(dt)
+            if MODE_ALERT_OLD:
+                self.speed = self.__handle_alert_distance(dt)
         elif self.speed < self.user_set_speed:
             print("Speeding up")
             self.system_info.setSafetyRange("Speeding")
             self.speed = self.speed + dt * SPEED_ACCELERATION
             #speed = speed - dt * get_deccelleration(speed)
-
+        else:
+            self.system_info.setSafetyRange("Maintaining")
 
     def __straightness_correction(self):
         """
