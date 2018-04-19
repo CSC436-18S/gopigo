@@ -18,8 +18,7 @@ MAX_SPEED = 250         # The max speed to allow the rover to go at (power units
 MIN_SPEED = 30          # The minimum speed to allow the rover to go at. This prevents issues caused by mechanical
                         # differences between the motors that cause problems at very low speeds. (power units)
 
-INC_CONST = 100.0       # A constant used for calculating the power difference to apply to compensate for the rover not
-                        # moving in a straight path.
+INC_CONST = 10          # The power difference to apply to compensate for the rover not moving in a straight path. (power units)
 
 CRITICAL_DISTANCE_MIN = 12  # The minimum critical distance to allow. This should be sufficient to allow the rover to
                             # stop at most speeds. (cm)
@@ -42,6 +41,9 @@ STOP_THRESHOLD = 0.01       # A value used to prevent odd fluctuations of the sp
 SAMPLE_SIZE = 10            # The number of obstacle distance readings to sample to calculate relative velocity
 ALERT_THRESHOLD = 5.0       # A threshold used to determine whether to adjust speed based on the obstacle's relative
                             # velocity, when between the safe and alert distances (cm/s)
+
+ENCODER_READ_TRIES = 5      # The number of tries to allow for repeated encoder tick readings to try to get a valid set
+                            # of readings.
 
 USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
@@ -116,7 +118,7 @@ class ACC(object):
         self.system_info.setTicksRight(self.elapsed_ticks_right)
 
         self.system_info.setUserSetSpeed(self.user_set_speed)
-        self.system_info.setSafeDistance(self.safe_distance)
+        self.system_info.setSafeDistance(int(self.safe_distance))
         self.system_info.setCriticalDistance(int(self.critical_distance))
         self.system_info.setAlertDistance(int(self.alert_distance))
 
@@ -454,17 +456,14 @@ def get_inc(speed):
     """
     Returns the power amount to use in straightness correcting.
 
-    It is based on the current speed, so that at higher speeds it corrects with
-    less, and at lower speeds it corrects with more.
-
     :param float speed: The current speed that the rover is going (power units)
     :return: The correction power change (power units)
     :rtype: float
     """
-    if speed < 0.1 and speed > -0.1:
+    if speed < MIN_SPEED:
         return 0
     else:
-        return 2.0 * (9.0 / (speed / INC_CONST)) / 1.5
+        return INC_CONST
 
 
 def read_enc_ticks(initial_ticks_left, initial_ticks_right):
@@ -476,6 +475,10 @@ def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     pins to communicate with the rover, as the official gopigo library does
     this.
 
+    If an error is returned from either of the encoder readings, then it tries
+    to take more readings until either a valid pair of readings is made or a
+    try limit is exceeded.
+
     :param int initial_ticks_left: The number of left motor ticks recorded at
     the start of the ACC. (ticks)
     :param int initial_ticks_right: The number of right motor ticks recorded at
@@ -484,10 +487,18 @@ def read_enc_ticks(initial_ticks_left, initial_ticks_right):
     occurred since the start of the ACC. (ticks)
     :rtype: tuple[int, int]
     """
-    time.sleep(0.01)
-    elapsed_ticks_left = gopigo.enc_read(gopigo.LEFT) - initial_ticks_left
-    time.sleep(0.01)
-    elapsed_ticks_right = gopigo.enc_read(gopigo.RIGHT) - initial_ticks_right
+    found_good_reading = False
+    tries = 0
+    while not found_good_reading and tries < ENCODER_READ_TRIES:
+        time.sleep(0.01)
+        elapsed_ticks_left = gopigo.enc_read(gopigo.LEFT) - initial_ticks_left
+        time.sleep(0.01)
+        elapsed_ticks_right = gopigo.enc_read(gopigo.RIGHT) - initial_ticks_right
+
+        tries += 1
+
+        if elapsed_ticks_left >= 0 and elapsed_ticks_right >= 0:
+            found_good_reading = True
 
     return elapsed_ticks_left, elapsed_ticks_right
 
