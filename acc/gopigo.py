@@ -50,4 +50,10 @@ def us_dist(pin):
     else:
         return None
 
+
+
 def read_motor_speed():
+
+def set_left_speed(speed):
+
+def set_right_speed(speed):

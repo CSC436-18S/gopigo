@@ -87,14 +87,18 @@ class ACC:
         if l_ticks is not None:
             old_ticks = self.elapsed_ticks_left
             self.elapsed_ticks_left = l_ticks - self.elapsed_ticks_left
-            self.n_ticks
+            self.n_ticks_l = self.elapsed_ticks_left - old_ticks
         else:
             self.elapsed_ticks_left = self.elapsed_ticks_left
+            self.n_ticks_l = 0
 
         if r_ticks is not None:
+            old_ticks = self.elapsed_ticks_right
             self.elapsed_ticks_right = r_ticks - self.elapsed_ticks_right
+            self.n_ticks_r = self.elapsed_ticks_right - old_ticks
         else:
             self.elapsed_ticks_right = self.elapsed_ticks_right
+            self.n_ticks_r = 0
 
         if self.elapsed_ticks_left >= MAX_TICK_COUNT or (self.elapsed_ticks_right >= MAX_TICK_COUNT):
             carry_over_delta = self.elapsed_ticks_left - self.elapsed_ticks_right
@@ -117,16 +121,42 @@ class ACC:
         self.right_rotation_rate = self.right_rotation_rate + (delta_ticks/dt)
 
 
-    def velocity_to_power_calculation(self):
+    def velocity_to_power_calculation(self, dt):
         self.v_path_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
         self.v_path_right = self.right_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
 
         self.v_desired_left = self.v_path_left + self.safe_speed
         self.v_desired_right = self.v_path_right + self.safe_speed
 
-        self.prev_achieved_v = (self)
+        v_old_l = self.prev_achieved_v_l
+        v_old_r = self.prev_achieved_v_r
+        self.prev_achieved_v_l = (self.n_ticks_l/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+        self.prev_achieved_v_r = (self.n_ticks_r/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+
+        v_new_l = (self.prev_achieved_v_l - v_old_l)*(self.left_power/v_old_l)*self.v_desired_left
+        v_new_r = (self.prev_achieved_v_r - v_old_r)*(self.right_power/v_old_r)*self.v_desired_right
+
+        self.left_power = self.left_power + (v_new_l*(self.left_power/self.prev_achieved_v_l))
+        self.right_power = self.right_power + (v_new_r*(self.right_power/self.prev_achieved_v_r))
+
+        if self.left_power > 255:
+            self.left_power = 255
+        elif self.left_power is 255:
+            self.left_power = 255
+
+        if self.right_power > 255:
+            self.right_power = 255
+        elif self.right_power is 255:
+            self.right_power = 255
+
 
     def actualize_power(self):
+        if self.stop:
+            gopigo.set_left_speed(0)
+            gopigo.set_right_speed(0)
+        else:
+            gopigo.set_left_speed(self.left_power)
+            gopigo.set_right_speed(self.right_power)
 
 
     def power_off(self):
