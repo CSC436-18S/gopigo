@@ -7,7 +7,6 @@ from flask import Flask, render_template, request, render_template, jsonify
 from flask_restful import Api, Resource
 from flask_cors import CORS
 import json
-from collections import OrderedDict
 
 from settings import SystemInfo
 
