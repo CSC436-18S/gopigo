@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, render_template, jsonify
 from flask_restful import Api, Resource
 from flask_cors import CORS
 import json
+from collections import OrderedDict
 
 from settings import SystemInfo
 
@@ -51,17 +52,17 @@ def run(isDebug):
 """
 @app.route('/api/system-info', methods=['GET'])
 def get_settings():
-  res = jsonify({
-    'state': {
-      'currentSpeed': system_info.getCurrentSpeed(),
-      'obstacleDistance': system_info.getObstacleDistance()
-    },
-    'settings': {
-      'safeDistance': system_info.getSafeDistance(),
-      'userSetSpeed': system_info.getUserSetSpeed()
-    }
+  state = OrderedDict([
+    ('currentSpeed', system_info.getCurrentSpeed()),
+    ('obstacleDistance', system_info.getObstacleDistance())])
+  settings = OrderedDict([
+    ('userSetSpeed', system_info.getUserSetSpeed()),
+    ('safeDistance', system_info.getSafeDistance())
+  ])
+  res = json.dumps({
+    "state": state,
+    "settings": settings
   })
-  res.status_code = 200
   return res
 
 """
