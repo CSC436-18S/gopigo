@@ -20,7 +20,7 @@ from settings import SystemInfo
 app = Flask(__name__)
 api = Api(app)
 CORS(app)
-PORT = 3000
+PORT = 8080
 HOSTNAME = "http://localhost"
 
 """
