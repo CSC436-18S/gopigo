@@ -180,6 +180,15 @@
       height: 30px;
     }
 
+    table {
+      height: 100%;
+      width: 100%;
+    }
+
+    td.td-value {
+      text-align: right;
+    }
+
     @media screen and (max-width: 400px) {
       .page-container {
         padding: 0 10px;
@@ -239,8 +248,15 @@
               <button id='system-content-refresh'>Refresh</button>
             </div>
             <div id='system-info'>
-              <span id='display-info-timestamp'></span>
-              <div id='display-info-content'></div>
+              <table>
+                <tbody id='table-info'>
+                  <tr>
+                    <td>Last Updated</td>
+                    <td class='td-value' id='table-timestamp'></td>
+                  </tr>
+                  <td>&nbsp;</td>
+                </tbody>
+              </table>
             </div>
           </div>
           <div class='system-content-item'>
@@ -252,19 +268,22 @@
   </div>
 
   <script type='text/javascript'>
-    const content = document.getElementById('display-info-content');
+    /**
+     * all constants that JS needs to know about prior to usage;
+     * handles window.onload
+     * 
+     */
+    const content = document.getElementById('table-info');
+    const table_timestamp = document.getElementById('table-timestamp');
     const refresh = document.getElementById('system-content-refresh');
     const form = document.getElementById('form');
     const settings_status = document.getElementById('settings-status');
     const power_switch = document.getElementById('power-switch');
-    const info_timestamp = document.getElementById('display-info-timestamp');
 
     const SYSTEM_INFO = '{{hostname}}:{{port}}/api/system-info';
     const USER_SETTINGS = '{{hostname}}:{{port}}/api/user-settings';
     const TURN_OFF = '{{hostname}}:{{port}}/api/turn-off';
     const POWER_STATUS = '{{hostname}}:{{port}}/api/power-status';
-
-    let current_settings;
 
     let ts = new Date();
     let timeout;
@@ -277,14 +296,22 @@
 
       getSystemInfo().then(json => {
         refreshSettings(json);
+        updateTS(false);
+        refreshTimestamp();
       });
     }
   </script>
 
   <script type='text/javascript'>
+    /**
+     * handles when user submits the form
+     * once making a GET request to retrieve the current settings,
+     * it checks if the form input is valid.
+     * 
+     * if form data is invalid, it uses the current settings
+     * 
+     */
     form.onsubmit = (event) => {
-      clearTimeout(timeout);
-      clearInterval(ts_timeout);
       event.preventDefault();
       const form_speed = document.getElementById('speed').value;
       const form_distance = document.getElementById('distance').value;
@@ -293,9 +320,9 @@
       settings_status.style.color = '';
       settings_status.style.display = 'none';
 
-      if (form_speed.length !== 0 && form_distance.length !== 0) {
-        const num_speed = parseInt(form_speed);
-        const num_distance = parseInt(form_distance);
+      getSystemInfo().then(json => {
+        const num_speed = form_speed.length !== 0 ? parseInt(form_speed) : json.settings.userSetSpeed;
+        const num_distance = form_distance.length !== 0 ? parseInt(form_distance) : json.settings.safeDistance;
         const form_data = {
           "speed": num_speed,
           "distance": num_distance
@@ -308,31 +335,39 @@
           },
           body: JSON.stringify(form_data)
         }).then(res => {
-          updateTS(true);
-          refreshTimestamp();
           settings_status.innerHTML = 'Settings have been sent to GoPiGo'
           settings_status.style.display = 'block';
           removeSettingStatus();
+
         })
-      } else {
-        settings_status.innerHTML = 'Settings must not be empty';
-        settings_status.style.color = '#f44336';
-        settings_status.style.display = 'block';
-        removeSettingStatus();
-      }
+      });
     };
 
   </script>
 
   <script type='text/javascript'>
+    /**
+     * handles when user presses the refresh button.
+     * 
+     * grabs system info and resets the timer
+     */
     refresh.onclick = (event) => {
       getSystemInfo().then(json => {
         refreshSettings(json);
+        clearInterval(ts_timeout);
+        updateTS(true);
+        refreshTimestamp();
       });
     }
   </script>
 
   <script type='text/javascript'>
+    /**
+     * handles when user presses the power_switch button
+     * which makes a POST request to turn the power off,
+     * and then disables the button from being allowed to be
+     * pressed again
+     */
     power_switch.onclick = (event) => {
       event.preventDefault();
       fetch(TURN_OFF, {
@@ -343,6 +378,11 @@
   </script>
 
   <script type='text/javascript'>
+    /**
+     * makes a GET request for the system information
+     *
+     * @return {JSON} The system information.
+     */
     const getSystemInfo = () => (
       fetch(SYSTEM_INFO, {
         method: 'GET',
@@ -350,39 +390,64 @@
           'Accept': 'application/json'
         }
       })
-        .then(res => {
-          current_settings = res.json();
-          return current_settings;
-        })
+        .then(res => res.json())
         .catch(err => {
           console.log(err);
         })
     );
+
+    /**
+     * cleans the table of all system information and
+     * adds the new information after
+     *
+     * @param {JSON} json the JSON Object with the current settings
+     *
+     */
     const refreshSettings = (json) => {
-      content.innerHTML = '';
+      while (content.childNodes.length > 4) {
+        content.removeChild(content.lastChild);
+      }
       setTimeout(() => {
-        for (key in json) {
-          const div = document.createElement('div'); const regular = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-          div.innerHTML = regular + ': ' + json[key]; content.appendChild(div);
-        }
+        const state = json.state
+        const settings = json.settings;
+        mapJsonToTable(state);
+        tableAddSpace();
+        mapJsonToTable(settings);
       }, 50);
     }
+
+    /**
+     * refreshes the timestamp in the table
+     * 
+     * @param {Boolean} shouldRefreshTime whether or not we use the relative
+     * timestamp before or now in time 
+     */
     const updateTS = (shouldRefreshTime) => {
       const now = new Date();
 
       if (shouldRefreshTime)
         ts = now;
 
-      const diff = Math.round(Math.abs(now.getTime() - ts.getTime()) / 1000);
-      info_timestamp.innerHTML = "Last Updated: " + diff + "s";
+      const seconds = Math.round(Math.abs(now.getTime() - ts.getTime()) / 1000);
+      table_timestamp.innerHTML = seconds + 's';
     }
 
+    /**
+     * sets the timestamp interval, and refreshes the timestamp
+     *
+     */
     const refreshTimestamp = () => {
       ts_timeout = setInterval(() => {
         updateTS(false);
       }, 5000);
     }
 
+    /**
+     * sets the classnames of the power div
+     *
+     * @param {Boolean} power whether or not the API says we have power
+     * 
+     */
     const setPowerDisplay = (power) => {
       if (power) {
         power_switch.className = 'power-off';
@@ -393,6 +458,11 @@
       }
     }
 
+    /**
+     * makes a GET request to retrieve the current power status
+     *
+     * @return {Promise} asychronous power status.
+     */
     const getPowerStatus = () => {
       return new Promise(resolve => {
         fetch(POWER_STATUS, {
@@ -411,11 +481,47 @@
       })
     }
 
+    /**
+     * refreshes the form submission status timeout
+     *
+     * @return     {<type>}  { description_of_the_return_value }
+     */
     const removeSettingStatus = () => {
       timeout = setTimeout(() => {
         settings_status.style.display = 'none';
       }, 5000);
     };
+
+    /**
+     * takes a set of json data and adds it to the system information table
+     *
+     * @param {JSON} json JSON Object containing key value information
+     * 
+     */
+    const mapJsonToTable = (json) => {
+      for (key in json) {
+        const row = document.createElement('tr');
+        const row_key = document.createElement('td');
+        const regular = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        row_key.innerText = regular;
+        const row_value = document.createElement('td');
+        row_value.className = 'td-value';
+        row_value.innerText = json[key];
+        row.appendChild(row_key);
+        row.appendChild(row_value);
+        content.appendChild(row);
+      }
+    }
+
+    /**
+     * adds a blank space to the table to separate content for better readability
+     *
+     */
+    const tableAddSpace = () => {
+      const row = document.createElement('td');
+      row.innerHTML = '&nbsp;';
+      content.appendChild(row);
+    }
 
   </script>
 </body>

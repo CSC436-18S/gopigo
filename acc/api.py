@@ -7,6 +7,7 @@ from flask import Flask, render_template, request, render_template, jsonify
 from flask_restful import Api, Resource
 from flask_cors import CORS
 import json
+from collections import OrderedDict
 
 from settings import SystemInfo
 
@@ -20,7 +21,7 @@ from settings import SystemInfo
 app = Flask(__name__)
 api = Api(app)
 CORS(app)
-PORT = 8080
+PORT = 3000
 HOSTNAME = "http://localhost"
 
 """
@@ -45,21 +46,24 @@ def index():
 def run(isDebug):
   app.run(port=PORT, debug=isDebug, threaded=True)
 
-
 """
   handles getting the user settings
   by returing the user settings jsonified
 """
 @app.route('/api/system-info', methods=['GET'])
 def get_settings():
-  res = jsonify({
-    "userSetSpeed": system_info.getUserSetSpeed(),
-    "safeDistance": system_info.getSafeDistance(),
-    "obstacleDistance": system_info.getObstacleDistance(),
-    "currentSpeed": system_info.getCurrentSpeed()
+  data = jsonify({
+    'state': {
+      'currentSpeed': system_info.getCurrentSpeed(),
+      'obstacleDistance': system_info.getObstacleDistance()
+    },
+    'settings': {
+      'safeDistance': system_info.getSafeDistance(),
+      'userSetSpeed': system_info.getUserSetSpeed()
+    }
   })
-  res.status_code = 200
-  return res
+  data.status_code = 200
+  return data
 
 """
   handles POST request of user settings from fetch,
