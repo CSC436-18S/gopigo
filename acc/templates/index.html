@@ -285,6 +285,8 @@
     const TURN_OFF = '{{hostname}}:{{port}}/api/turn-off';
     const POWER_STATUS = '{{hostname}}:{{port}}/api/power-status';
 
+    const TS_TIMEOUT = 1000;
+
     let ts = new Date();
     let timeout;
     let ts_timeout;
@@ -439,7 +441,7 @@
     const refreshTimestamp = () => {
       ts_timeout = setInterval(() => {
         updateTS(false);
-      }, 5000);
+      }, TS_TIMEOUT);
     }
 
     /**
