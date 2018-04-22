@@ -89,8 +89,6 @@ def post_settings():
   distance = dataDict['distance']
   system_info.setUserSetSpeed(speed)
   system_info.setSafeDistance(distance)
-  print('speed: ', speed)
-  print('distance: ', distance)
   return json.dumps(system_info.__dict__)
 
 
@@ -104,7 +102,6 @@ def get_power():
     "power": system_info.getPower()
   })
   res.status_code = 200
-  print('powerRes: ', res)
   return res
 
 """
@@ -115,9 +112,7 @@ def get_power():
 """
 @app.route('/api/power-status', methods=['POST'])
 def post_power():
-  print('data: ', request.data)
   dataDict = json.loads(request.data)
   global power
   power = dataDict['power']
-  print('power: ', power)
   return jsonify(power)
