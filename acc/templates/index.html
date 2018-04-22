@@ -20,20 +20,33 @@
       padding: 0;
     }
 
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+    }
+
     .power-off {
       background: #f44336;
     }
 
+    .power-off,
     .power-on {
-      background: #009900;
+      height: 55px;
+      width: 120px;
+    }
+
+    .power-on {
+      background: #D3D3D3;
+      user-select: none;
+    }
+
+    .power-on:active {
+      background: #D3D3D3;
     }
 
     .power-off:active {
       background: #ab1409;
-    }
-
-    .power-on:active {
-      background: #006b00;
     }
 
     .hidden {
@@ -100,6 +113,7 @@
 
     .form-section input[type=submit] {
       width: 100%;
+      margin-top: 10px;
     }
 
     button:active,
@@ -109,7 +123,6 @@
 
     button,
     input[type=submit] {
-      margin-top: 10px;
       outline: none;
       background: #4285F4;
       border: 0;
@@ -134,6 +147,7 @@
       display: flex;
       flex-direction: column;
       position: relative;
+      margin-top: 10px;
     }
 
     .system-content-item+.system-content-item {
@@ -147,6 +161,23 @@
     #settings-status {
       display: none;
       margin-top: 10px;
+    }
+
+    .system-content-header {
+      display: flex;
+      align-items: center;
+    }
+
+    .system-content-header h3 {
+      margin-right: 10px;
+    }
+
+    #system-content-refresh {
+      margin: 0;
+      font-size: .8em;
+      padding: 0 5px;
+      line-height: 1;
+      height: 30px;
     }
 
     @media screen and (max-width: 400px) {
@@ -172,8 +203,9 @@
       .power-off:hover {
         background: #ab1409;
       }
+
       .power-on:hover {
-        background: #006b00;
+        background: #D3D3D3;
       }
     }
   </style>
@@ -202,42 +234,57 @@
         </div>
         <div class='system-content'>
           <div class='system-content-item'>
-            <button id='display-info'>System Information</button>
-            <div class='hidden' id='system-info'>
-              <p>System information</p>
+            <div class='system-content-header'>
+              <h3>System Information</h3>
+              <button id='system-content-refresh'>Refresh</button>
+            </div>
+            <div id='system-info'>
+              <span id='display-info-timestamp'></span>
               <div id='display-info-content'></div>
             </div>
           </div>
           <div class='system-content-item'>
-            <button class='power-on' id='powerSwitch'>Power On</button>
+            <button id='power-switch'></button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!--
-    handles the functionality when the user submits the form
-    sends POST request to /api/form
-  -->
   <script type='text/javascript'>
+    const content = document.getElementById('display-info-content');
+    const refresh = document.getElementById('system-content-refresh');
     const form = document.getElementById('form');
-    const url = 'http://localhost:8080/api/user-settings';
     const settings_status = document.getElementById('settings-status');
+    const power_switch = document.getElementById('power-switch');
+    const info_timestamp = document.getElementById('display-info-timestamp');
 
-    /**
-     create timeout variable, and clear on submit if a previous
-     timeout has been set, so the timeout is refreshed
-     */
+    const SYSTEM_INFO = '{{hostname}}:{{port}}/api/system-info';
+    const USER_SETTINGS = '{{hostname}}:{{port}}/api/user-settings';
+    const TURN_OFF = '{{hostname}}:{{port}}/api/turn-off';
+    const POWER_STATUS = '{{hostname}}:{{port}}/api/power-status';
+
+    let current_settings;
+
+    let ts = new Date();
     let timeout;
-    const removeSettingStatus = () => {
-      timeout = setTimeout(() => {
-        settings_status.style.display = 'none';
-      }, 5000);
-    };
+    let ts_timeout;
 
+    window.onload = () => {
+      getPowerStatus().then((power) => {
+        setPowerDisplay(power);
+      });
+
+      getSystemInfo().then(json => {
+        refreshSettings(json);
+      });
+    }
+  </script>
+
+  <script type='text/javascript'>
     form.onsubmit = (event) => {
       clearTimeout(timeout);
+      clearInterval(ts_timeout);
       event.preventDefault();
       const form_speed = document.getElementById('speed').value;
       const form_distance = document.getElementById('distance').value;
@@ -246,25 +293,23 @@
       settings_status.style.color = '';
       settings_status.style.display = 'none';
 
-
       if (form_speed.length !== 0 && form_distance.length !== 0) {
         const num_speed = parseInt(form_speed);
         const num_distance = parseInt(form_distance);
         const form_data = {
           "speed": num_speed,
           "distance": num_distance
-        }
+        };
 
-        /**
-          send user settings to api
-         */
-        fetch(url, {
+        fetch(USER_SETTINGS, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(form_data)
         }).then(res => {
+          updateTS(true);
+          refreshTimestamp();
           settings_status.innerHTML = 'Settings have been sent to GoPiGo'
           settings_status.style.display = 'block';
           removeSettingStatus();
@@ -276,75 +321,81 @@
         removeSettingStatus();
       }
     };
+
   </script>
 
-  <!--
-    handles the functionality when the user selects the power off button
-  -->
   <script type='text/javascript'>
-    const power_switch = document.getElementById('powerSwitch');
+    refresh.onclick = (event) => {
+      getSystemInfo().then(json => {
+        refreshSettings(json);
+      });
+    }
+  </script>
+
+  <script type='text/javascript'>
     power_switch.onclick = (event) => {
       event.preventDefault();
-      const url = 'http://localhost:8080/api/power-status';
+      fetch(TURN_OFF, {
+        method: 'POST'
+      })
+      setPowerDisplay(false);
+    }
+  </script>
 
-      /**
-        fetch the current power setting and negate, then post
-        to the api
-      */
-      fetch(url, {
+  <script type='text/javascript'>
+    const getSystemInfo = () => (
+      fetch(SYSTEM_INFO, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
         }
       })
-        .then(res => res.json())
-        .then(json => {
-          const data = {
-            'power': !json.power
-          };
-          return fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-          })
-            .then(res => res.json())
-            .then(power => {
-              if (power) {
-                if (power_switch.className === 'power-on') {
-                  power_switch.className = 'power-off';
-                  power_switch.innerHTML = 'Power Off';
-                }
-              } else {
-                if (power_switch.className === 'power-off') {
-                  power_switch.className = 'power-on';
-                  power_switch.innerHTML = 'Power On';
-                }
-              }
-            })
+        .then(res => {
+          current_settings = res.json();
+          return current_settings;
         })
         .catch(err => {
-          console.log('ERROR: ', err)
-        });
-    };
-  </script>
+          console.log(err);
+        })
+    );
+    const refreshSettings = (json) => {
+      content.innerHTML = '';
+      setTimeout(() => {
+        for (key in json) {
+          const div = document.createElement('div'); const regular = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          div.innerHTML = regular + ': ' + json[key]; content.appendChild(div);
+        }
+      }, 50);
+    }
+    const updateTS = (shouldRefreshTime) => {
+      const now = new Date();
 
-  <!--
-    handles the functionality of when the user selects the system information button
-  -->
-  <script type='text/javascript'>
-    const display = document.getElementById('display-info');
-    const system_info = document.getElementById('system-info');
-    display.onclick = (event) => {
-      event.preventDefault();
-      if (system_info.className === 'hidden') {
-        const url = 'http://localhost:8080/api/user-settings';
+      if (shouldRefreshTime)
+        ts = now;
 
-        /**
-          fetch the current user settings
-         */
-        fetch(url, {
+      const diff = Math.round(Math.abs(now.getTime() - ts.getTime()) / 1000);
+      info_timestamp.innerHTML = "Last Updated: " + diff + "s";
+    }
+
+    const refreshTimestamp = () => {
+      ts_timeout = setInterval(() => {
+        updateTS(false);
+      }, 5000);
+    }
+
+    const setPowerDisplay = (power) => {
+      if (power) {
+        power_switch.className = 'power-off';
+        power_switch.innerHTML = 'Power Off';
+      } else {
+        power_switch.className = 'power-on';
+        power_switch.innerHTML = '';
+      }
+    }
+
+    const getPowerStatus = () => {
+      return new Promise(resolve => {
+        fetch(POWER_STATUS, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
@@ -352,29 +403,20 @@
         })
           .then(res => res.json())
           .then(json => {
-            const display = document.getElementById('display-info-content');
-            display.innerHTML = '';
-
-            /**
-              go through KV pairs, create div for each,
-              and append to display information div
-             */
-            for (key in json) {
-              if (json.hasOwnProperty(key)) {
-                const div = document.createElement('div');
-                div.innerHTML = key + ": " + json[key];
-                display.appendChild(div);
-              }
-            }
-            system_info.className = 'visible';
+            resolve(json.power);
           })
           .catch(err => {
-            console.log(err);
+            console.log('ERROR: ', err)
           });
-      } else {
-        system_info.className = 'hidden';
-      }
+      })
+    }
+
+    const removeSettingStatus = () => {
+      timeout = setTimeout(() => {
+        settings_status.style.display = 'none';
+      }, 5000);
     };
+
   </script>
 </body>
 
