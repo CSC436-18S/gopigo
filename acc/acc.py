@@ -62,12 +62,16 @@ class ACC:
 
         :return:
         """
+        command = self.command_queue.get
+        if command is not None:
+            if command
 
 
     def determine_safety_values(self):
 
 
     def validate_user_settings(self):
+
 
 
     def straightness_correction_calculation(self, dt):
@@ -160,6 +164,9 @@ class ACC:
 
 
     def power_off(self):
-
-
-
+        while self.current_distance <= self.minimum_settable_safe_distance:
+            self.process_commands()
+            self.determine_safety_values()
+            self.validate_user_settings()
+            self.straightness_correction_calculation(dt)
+            self.velocity_to_power_calculation(dt)
