@@ -51,7 +51,7 @@ def run(isDebug):
 """
 @app.route('/api/system-info', methods=['GET'])
 def get_settings():
-  data = jsonify({
+  res = jsonify({
     'state': {
       'currentSpeed': system_info.getCurrentSpeed(),
       'obstacleDistance': system_info.getObstacleDistance()
@@ -61,8 +61,8 @@ def get_settings():
       'userSetSpeed': system_info.getUserSetSpeed()
     }
   })
-  data.status_code = 200
-  return data
+  res.status_code = 200
+  return res
 
 """
   handles POST request of user settings from fetch,
