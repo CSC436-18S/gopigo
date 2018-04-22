@@ -6,6 +6,8 @@ import smbus
 LEFT = 0                    #Used to denote the Left Motor
 RIGHT = 1                   #Used to denote the Right Motor
 
+USS = 15                    #Pin used to access the Ultrasonic Sensor
+
 ADDRESS = 0x08
 
 ENC_READ_CMD = [53]
@@ -54,6 +56,6 @@ def us_dist(pin):
 
 def read_motor_speed():
 
-def set_left_speed(speed):
+def set_left_speed(power):
 
-def set_right_speed(speed):
+def set_right_speed(power):

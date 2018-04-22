@@ -4,17 +4,21 @@ related to the ACC's control of the rover.
 """
 
 import gopigo
+import commands
 
 
 BUFFER_DISATANCE = 0.3      #Approximate length of one Rover, in meters.
 MAX_TICK_COUNT = 20000      #Number at which the total number of elapsed ticks should be reset
-WHEEL_RAD=3.25
-WHEEL_CIRC=2*math.pi*WHEEL_RAD
+MAX_STOPPING_DISTANCE = 7.5 #Maximum distance the Rovers were found to skid on a slick surface at Max Speed
+SLOWDOWN_TIME = 1.0         #Time desired to decelerate when approaching an obstacle to the necessary speed
+MAX_POWER_VALUE = 255       #Maximum Power Value capable of being used for the motors
+
+WHEEL_RAD = 3.25
+WHEEL_CIRC = 2*math.pi*WHEEL_RAD
 TICK_MARKS = 18
 
 
 class ACC:
-
 
     def __init__(self, command_queue, user_set_speed, safe_distance):
         """
@@ -46,7 +50,7 @@ class ACC:
         """
         This function enacts the primary functionality of the ACC, as outlined by the "Main Diagram" sequence diagram.
         """
-        while not self.power_on:
+        while self.power_on:
             self.process_commands()
             self.determine_safety_values()
             self.validate_user_settings()
@@ -64,14 +68,68 @@ class ACC:
         """
         command = self.command_queue.get
         if command is not None:
-            if command
+            if command is commands.ChangeSettingsCommand:
+                if command.userSetSpeed is not None:
+                    self.user_set_speed = command.userSetSpeed
+                else:
+                    self.user_set_speed = self.currentSpeed
+
+                if command.safeDistance is not None:
+                    self.safe_distance = command.safeDistance
+                else:
+                    self.safe_distance = self.currentDistance
+
+            elif command is commands.TurnOffCommand:
+                self.power_on = False
 
 
-    def determine_safety_values(self):
+    def determine_safety_values(self, dt):
+        self.right_rotation_rate = (gopigo.enc_read(gopigo.RIGHT) - self.elapsed_ticks_right)/dt
+        self.left_rotation_rate = (gopigo.enc_read(gopigo.LEFT) - self.elapsed_ticks_left)/dt
+
+        self.caculate_current_speed()
+        self.observe_obstacle(dt)
+        self.critical_distance = (MAX_STOPPING_DISTANCE/MAX_POWER_VALUE)*max(self.current_speed_left, self.current_speed_right)
+        self.mimum_settable_safe_distance = self.critical_distance + BUFFER_DISATANCE
+        self.alert_distance = self.safe_distance + max(self.current_speed_left, self.current_speed_right)*SLOWDOWN_TIME
+        self.perform_obstalce_based_acceleratioin_determination()
+
+
+    def caculate_current_speed(self):
+        self.current_speed_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+        self.current_speed_right = self.right_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+
+
+    def observe_obstacle(self, dt):
+        prev_dist = self.current_distance
+        self.current_distance = gopigo.us_dist(gopigo.USS)
+
+        if self.current_distance is 0:
+            self.current_distance = None
+        elif self.current_distance is -1:
+            self.current_distance = None
+        else:
+            if prev_dist is not None:
+                self.obstacle_velocity = (self.current_distance - prev_dist)/dt + (self.current_speed_right + self.current_speed_left)/2.0
+            else:
+                self.obstacle_velocity = None
+
+    def perform_obstalce_based_acceleratioin_determination(self):
+
 
 
     def validate_user_settings(self):
+        if self.user_set_speed is not None:
+            if self.user_set_speed > self.safe_speed:
+                self.set_speed = self.safe_speed
+            else:
+                self.set_speed = self.user_set_speed
 
+        if self.safe_distance is not None:
+            if self.safe_distance < self.mimum_settable_safe_distance:
+                self.set_distance = self.mimum_settable_safe_distance
+            else:
+                self.set_distance = self.safe_distance
 
 
     def straightness_correction_calculation(self, dt):
@@ -143,15 +201,15 @@ class ACC:
         self.left_power = self.left_power + (v_new_l*(self.left_power/self.prev_achieved_v_l))
         self.right_power = self.right_power + (v_new_r*(self.right_power/self.prev_achieved_v_r))
 
-        if self.left_power > 255:
-            self.left_power = 255
-        elif self.left_power is 255:
-            self.left_power = 255
+        if self.left_power > MAX_POWER_VALUE:
+            self.left_power = MAX_POWER_VALUE
+        elif self.left_power is MAX_POWER_VALUE:
+            self.left_power = MAX_POWER_VALUE
 
-        if self.right_power > 255:
-            self.right_power = 255
-        elif self.right_power is 255:
-            self.right_power = 255
+        if self.right_power > MAX_POWER_VALUE:
+            self.right_power = MAX_POWER_VALUE
+        elif self.right_power is MAX_POWER_VALUE:
+            self.right_power = MAX_POWER_VALUE
 
 
     def actualize_power(self):
