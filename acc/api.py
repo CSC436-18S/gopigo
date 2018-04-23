@@ -14,18 +14,6 @@ from collections import OrderedDict
 from settings import SystemInfo
 
 """
-  - create application instance of Flask
-  - create an API instance of the Flask application
-  - enable CORS to so web can correctly communicate with API
-  - create PORT and HOSTNAME that are sent to the index.html file
-    for requests
-"""
-app = Flask(__name__)
-api = Api(app)
-CORS(app)
-PORT = 8080
-
-"""
   used to grab correct network interface from for the hostname
   instead of localhost, which allows for mobile device connection
 """
@@ -37,6 +25,17 @@ def get_ip_address(ifname):
       struct.pack('256s', ifname[:15])
     )[20:24])
 
+"""
+  - create application instance of Flask
+  - create an API instance of the Flask application
+  - enable CORS to so web can correctly communicate with API
+  - create PORT and HOSTNAME that are sent to the index.html file
+    for requests
+"""
+app = Flask(__name__)
+api = Api(app)
+CORS(app)
+PORT = 8080
 """
   wlp2s0 is more standard version then wlan0 and eth0,
   if wlp2s0 cannot be found, default to wlan0
