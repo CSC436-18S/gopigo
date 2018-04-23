@@ -24,15 +24,23 @@ app = Flask(__name__)
 api = Api(app)
 CORS(app)
 PORT = 8080
- 
+
+"""
+  used to grab correct network interface from for the hostname
+  instead of localhost, which allows for mobile device connection
+"""
 def get_ip_address(ifname):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,
-        struct.pack('256s', ifname[:15])
+      s.fileno(),
+      0x8915,
+      struct.pack('256s', ifname[:15])
     )[20:24])
 
+"""
+  wlp2s0 is more standard version then wlan0 and eth0,
+  if wlp2s0 cannot be found, default to wlan0
+"""
 try:
   HOSTNAME = get_ip_address('wlp2s0')
 except IOError:
@@ -62,7 +70,8 @@ def run(isDebug):
 
 """
   handles getting the user settings
-  by returing the user settings jsonified
+  by returing the user settings from ordered tuples
+  of the settings so JSON does not serialize and re-order data
 """
 @app.route('/api/system-info', methods=['GET'])
 def get_settings():
