@@ -5,13 +5,16 @@ related to the ACC's control of the rover.
 
 import gopigo
 import commands
+import math
+import time
 
 
-BUFFER_DISATANCE = 0.3              # Approximate length of one Rover, in meters.
+BUFFER_DISATANCE = 30               # Approximate length of one Rover, in centimeters.
 MAX_TICK_COUNT = 20000              # Number at which the total number of elapsed ticks should be reset
 MAX_STOPPING_DISTANCE = 7.5         # Maximum distance the Rovers were found to skid on a slick surface at Max Speed
 SLOWDOWN_TIME = 1.0                 # Time desired to decelerate when approaching an obstacle to the necessary speed
 MAX_POWER_VALUE = 255               # Maximum Power Value capable of being used for the motors
+MAX_SPEED = 99999999                # Self explanatory
 
 WHEEL_RAD = 3.25
 WHEEL_CIRC = 2*math.pi*WHEEL_RAD
@@ -34,34 +37,62 @@ class ACC:
         if user_set_speed is None:
             motor_speeds = gopigo.read_motor_speed()
             self.user_set_speed = (motor_speeds[0] + motor_speeds[1]) / 2.0
+        else:
+            self.user_set_speed = user_set_speed
 
         if safe_distance is None:
             self.safe_distance = 2*BUFFER_DISATANCE
+        else:
+            self.safe_distance = safe_distance
 
         self.command_queue = command_queue
         self.power_on = True
         self.stop = False
         self.elapsed_ticks_left = 0
         self.elapsed_ticks_right = 0
-        #                                               #
-        #                                               #
-        # A BUNCH MORE VARIABLES MAY NEED SETTING HERE  #
-        #                                               #
-        #                                               #
+        self.alert_distance = None
+        self.critical_distance = None
+        self.current_acceleration = None
+        self.current_speed_left = None                  # This is a velocity
+        self.current_speed_right = None                 # This is a velocity
+        self.safe_speed = None
+        self.left_power = None
+        self.right_power = None
+        self.left_rotation_rate = None                  # Ticks per second
+        self.right_rotation_rate = None                 # Ticks per second
+        self.minimum_settable_safe_distance = None
+        self.n_ticks_l = None
+        self.n_ticks_r = None
+        self.obstacle_distance = None
+        self.obstacle_velocity = None
+        self.obstacle_acceleration = None
+        self.prev_achieved_v_l = None
+        self.prev_achieved_v_r = None
+        self.set_speed = None
+        self.set_distance = None
+        self.v_desired_left = None
+        self.v_desired_right = None
+        self.v_path_left = None
+        self.v_path_right = None
 
     def run(self):
         """
         This function enacts the primary functionality of the ACC, as outlined by the "Main Diagram" sequence diagram.
         """
+        prev_time = time.time()
         while self.power_on:
             self.process_commands()
-            self.determine_safety_values()
+            if not self.power_on:
+                break
+            dt = time.time() - prev_time
+            prev_time = time.time()
+            self.determine_safety_values(dt)
             self.validate_user_settings()
-            self.straightness_correction_calculation()
-            self.velocity_to_power_calculation()
+            self.straightness_correction_calculation(dt)
+            self.velocity_to_power_calculation(dt)
             self.actualize_power()
 
-        self.power_off()
+        self.power_off(prev_time)
 
 
     def process_commands(self):
@@ -69,34 +100,35 @@ class ACC:
 
         :return:
         """
-        command = self.command_queue.get
-        if command is not None:
-            if command is commands.ChangeSettingsCommand:
+        if not self.command_queue.empty():
+            command = self.command_queue.get()
+            if instanceof(command, commands.ChangeSettingsCommand):
                 if command.userSetSpeed is not None:
                     self.user_set_speed = command.userSetSpeed
                 else:
-                    self.user_set_speed = self.currentSpeed
+                    motor_speeds = gopigo.read_motor_speed()
+                    self.user_set_speed = (motor_speeds[0] + motor_speeds[1]) / 2.0
 
                 if command.safeDistance is not None:
                     self.safe_distance = command.safeDistance
                 else:
-                    self.safe_distance = self.currentDistance
+                    self.safe_distance = gopigo.us_dist(gopigo.USS)
 
-            elif command is commands.TurnOffCommand:
+            elif instanceof(command, commands.TurnOffCommand):
                 self.power_on = False
 
 
     def determine_safety_values(self, dt):
+        #TODO: May need to determine rotation rates in a more clever manner than simple time differentials
         self.right_rotation_rate = (gopigo.enc_read(gopigo.RIGHT) - self.elapsed_ticks_right)/dt
         self.left_rotation_rate = (gopigo.enc_read(gopigo.LEFT) - self.elapsed_ticks_left)/dt
 
         self.caculate_current_speed()
         self.observe_obstacle(dt)
         self.critical_distance = (MAX_STOPPING_DISTANCE/MAX_POWER_VALUE)*max(self.current_speed_left, self.current_speed_right)
-        self.mimum_settable_safe_distance = self.critical_distance + BUFFER_DISATANCE
+        self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISATANCE
         self.alert_distance = self.safe_distance + max(self.current_speed_left, self.current_speed_right)*SLOWDOWN_TIME
-        self.perform_obstalce_based_acceleratioin_determination()
-
+        self.perform_obstalce_based_acceleratioin_determination(dt)
 
     def caculate_current_speed(self):
         self.current_speed_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
@@ -106,26 +138,30 @@ class ACC:
     def observe_obstacle(self, dt):
         prev_dist = self.obstacle_distance
         self.obstacle_distance = gopigo.us_dist(gopigo.USS)
-
-        if self.obstacle_distance is 0:
-            self.obstacle_distance = None
-        elif self.obstacle_distance is -1:
-            self.obstacle_distance = None
+        #FIXME: This may need re-integrating, depending on how distances are determined for the absence of Obstacles
+        #if self.obstacle_distance == 0:
+        #    self.obstacle_distance = None
+        #else:
+        if prev_dist is not None:
+            prev_velocity = self.obstacle_velocity
+            self.obstacle_velocity = (self.obstacle_distance - prev_dist)/dt + (self.current_speed_right + self.current_speed_left)/2.0
+            if prev_velocity is not None:
+                self.obstacle_acceleration = (self.obstacle_velocity - prev_velocity)/dt
         else:
-            if prev_dist is not None:
-                self.obstacle_velocity = (self.obstacle_distance - prev_dist)/dt + (self.current_speed_right + self.current_speed_left)/2.0
-            else:
-                self.obstacle_velocity = None
+            self.obstacle_velocity = None
+            self.obstacle_acceleration = None
 
     def perform_obstalce_based_acceleratioin_determination(self, dt):
         if self.obstacle_distance <= self.critical_distance:
             gopigo.stop()
             self.stop = True
+            self.safe_speed = 0
         elif self.obstacle_distance <= self.safe_distance:
             if self.obstacle_acceleration is not None:
                 self.current_acceleration = ((self.obstacle_distance - self.safe_distance)/(dt*dt)) + self.obstacle_acceleration
             else:
                 self.current_acceleration = (self.obstacle_distance - self.safe_distance)/(dt*dt)
+            self.safe_speed = (self.current_speed_left + self.current_speed_right)/2.0 + self.current_acceleration
         elif self.obstacle_distance <= self.alert_distance:
             if self.obstacle_acceleration is not None:
                 comfort_parameter = dt/SLOWDOWN_TIME
@@ -134,10 +170,12 @@ class ACC:
             else:
                 comfort_parameter = dt/SLOWDOWN_TIME
                 self.current_acceleration = comfort_parameter*((self.obstacle_distance - self.safe_distance)/(dt*dt))
+            self.safe_speed = (self.current_speed_left + self.current_speed_right)/2.0 + self.current_acceleration
         else:
             comfort_parameter = dt/SLOWDOWN_TIME
             current_speed = (self.current_speed_left + self.current_speed_right)/2.0
             self.current_acceleration = comfort_parameter*((self.user_set_speed - current_speed)/dt)
+            self.safe_speed = MAX_SPEED
 
 
     def validate_user_settings(self):
@@ -148,8 +186,8 @@ class ACC:
                 self.set_speed = self.user_set_speed
 
         if self.safe_distance is not None:
-            if self.safe_distance < self.mimum_settable_safe_distance:
-                self.set_distance = self.mimum_settable_safe_distance
+            if self.safe_distance < self.minimum_settable_safe_distance:
+                self.set_distance = self.minimum_settable_safe_distance
             else:
                 self.set_distance = self.safe_distance
 
@@ -161,10 +199,10 @@ class ACC:
 
             if self.elapsed_ticks_left < self.elapsed_ticks_right:
                 self.increase_l_rotation_rate(delta_ticks, dt)
-            elif self.elapsed_ticks_right > self.elapsed_ticks_left:
+            elif self.elapsed_ticks_right < self.elapsed_ticks_left:
                 self.increase_r_rotation_rate(delta_ticks, dt)
 
-
+    #TODO: This needs to be looked at further
     def calculate_elapsed_ticks(self):
         l_ticks = gopigo.enc_read(gopigo.LEFT)
         r_ticks = gopigo.enc_read(gopigo.RIGHT)
@@ -205,6 +243,7 @@ class ACC:
         self.right_rotation_rate = self.right_rotation_rate + (delta_ticks/dt)
 
 
+    #TODO: This needs to be looked at further
     def velocity_to_power_calculation(self, dt):
         self.v_path_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
         self.v_path_right = self.right_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
@@ -234,6 +273,7 @@ class ACC:
             self.right_power = MAX_POWER_VALUE
 
 
+    #TODO: Don't forget about gopigo.fwd() etc.
     def actualize_power(self):
         if self.stop:
             gopigo.set_left_speed(0)
@@ -243,10 +283,12 @@ class ACC:
             gopigo.set_right_speed(self.right_power)
 
 
-    def power_off(self):
+    def power_off(self, prev_time):
         while self.obstacle_distance <= self.minimum_settable_safe_distance:
             self.process_commands()
-            self.determine_safety_values()
+            dt = time.time() - prev_time
+            prev_time = time.time()
+            self.determine_safety_values(dt)
             self.validate_user_settings()
             self.straightness_correction_calculation(dt)
             self.velocity_to_power_calculation(dt)
