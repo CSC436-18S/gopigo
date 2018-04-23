@@ -5,7 +5,7 @@ Running this module will start up the ACC and run the webserver for the user
 interface.
 """
 
-import acc
+#import acc
 import api
 
 def main():
