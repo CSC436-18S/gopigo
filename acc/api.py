@@ -2,7 +2,9 @@
 This is the module of the program that contains all of the functions related to
 the webserver that hosts the user interface for the ACC.
 """
-import os
+import struct
+import socket
+import fcntl
 from flask import Flask, render_template, request, render_template, jsonify
 from flask_restful import Api, Resource
 from flask_cors import CORS
@@ -22,7 +24,19 @@ app = Flask(__name__)
 api = Api(app)
 CORS(app)
 PORT = 8080
-HOSTNAME = "http://localhost"
+ 
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,
+        struct.pack('256s', ifname[:15])
+    )[20:24])
+
+try:
+  HOSTNAME = get_ip_address('wlp2s0')
+except IOError:
+  HOSTNAME = get_ip_address('wlan0')
 
 """
   default values for needed variables for application,
@@ -44,7 +58,7 @@ def index():
   function that handles starting the application on port 8080
 """
 def run(isDebug):
-  app.run(port=PORT, debug=isDebug, threaded=True)
+  app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
 
 """
   handles getting the user settings
