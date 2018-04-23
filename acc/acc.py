@@ -7,11 +7,11 @@ import gopigo
 import commands
 
 
-BUFFER_DISATANCE = 0.3      #Approximate length of one Rover, in meters.
-MAX_TICK_COUNT = 20000      #Number at which the total number of elapsed ticks should be reset
-MAX_STOPPING_DISTANCE = 7.5 #Maximum distance the Rovers were found to skid on a slick surface at Max Speed
-SLOWDOWN_TIME = 1.0         #Time desired to decelerate when approaching an obstacle to the necessary speed
-MAX_POWER_VALUE = 255       #Maximum Power Value capable of being used for the motors
+BUFFER_DISATANCE = 0.3              # Approximate length of one Rover, in meters.
+MAX_TICK_COUNT = 20000              # Number at which the total number of elapsed ticks should be reset
+MAX_STOPPING_DISTANCE = 7.5         # Maximum distance the Rovers were found to skid on a slick surface at Max Speed
+SLOWDOWN_TIME = 1.0                 # Time desired to decelerate when approaching an obstacle to the necessary speed
+MAX_POWER_VALUE = 255               # Maximum Power Value capable of being used for the motors
 
 WHEEL_RAD = 3.25
 WHEEL_CIRC = 2*math.pi*WHEEL_RAD
@@ -43,8 +43,11 @@ class ACC:
         self.stop = False
         self.elapsed_ticks_left = 0
         self.elapsed_ticks_right = 0
-
-
+        #                                               #
+        #                                               #
+        # A BUNCH MORE VARIABLES MAY NEED SETTING HERE  #
+        #                                               #
+        #                                               #
 
     def run(self):
         """
@@ -101,21 +104,40 @@ class ACC:
 
 
     def observe_obstacle(self, dt):
-        prev_dist = self.current_distance
-        self.current_distance = gopigo.us_dist(gopigo.USS)
+        prev_dist = self.obstacle_distance
+        self.obstacle_distance = gopigo.us_dist(gopigo.USS)
 
-        if self.current_distance is 0:
-            self.current_distance = None
-        elif self.current_distance is -1:
-            self.current_distance = None
+        if self.obstacle_distance is 0:
+            self.obstacle_distance = None
+        elif self.obstacle_distance is -1:
+            self.obstacle_distance = None
         else:
             if prev_dist is not None:
-                self.obstacle_velocity = (self.current_distance - prev_dist)/dt + (self.current_speed_right + self.current_speed_left)/2.0
+                self.obstacle_velocity = (self.obstacle_distance - prev_dist)/dt + (self.current_speed_right + self.current_speed_left)/2.0
             else:
                 self.obstacle_velocity = None
 
-    def perform_obstalce_based_acceleratioin_determination(self):
-
+    def perform_obstalce_based_acceleratioin_determination(self, dt):
+        if self.obstacle_distance <= self.critical_distance:
+            gopigo.stop()
+            self.stop = True
+        elif self.obstacle_distance <= self.safe_distance:
+            if self.obstacle_acceleration is not None:
+                self.current_acceleration = ((self.obstacle_distance - self.safe_distance)/(dt*dt)) + self.obstacle_acceleration
+            else:
+                self.current_acceleration = (self.obstacle_distance - self.safe_distance)/(dt*dt)
+        elif self.obstacle_distance <= self.alert_distance:
+            if self.obstacle_acceleration is not None:
+                comfort_parameter = dt/SLOWDOWN_TIME
+                self.current_acceleration = \
+                    comfort_parameter*(((self.obstacle_distance - self.safe_distance)/(dt*dt)) + self.obstacle_acceleration)
+            else:
+                comfort_parameter = dt/SLOWDOWN_TIME
+                self.current_acceleration = comfort_parameter*((self.obstacle_distance - self.safe_distance)/(dt*dt))
+        else:
+            comfort_parameter = dt/SLOWDOWN_TIME
+            current_speed = (self.current_speed_left + self.current_speed_right)/2.0
+            self.current_acceleration = comfort_parameter*((self.user_set_speed - current_speed)/dt)
 
 
     def validate_user_settings(self):
@@ -222,7 +244,7 @@ class ACC:
 
 
     def power_off(self):
-        while self.current_distance <= self.minimum_settable_safe_distance:
+        while self.obstacle_distance <= self.minimum_settable_safe_distance:
             self.process_commands()
             self.determine_safety_values()
             self.validate_user_settings()
