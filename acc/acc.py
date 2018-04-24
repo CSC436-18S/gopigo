@@ -48,8 +48,8 @@ class ACC:
         self.command_queue = command_queue
         self.power_on = True
         self.stop = False
-        self.elapsed_ticks_left = 0
-        self.elapsed_ticks_right = 0
+        self.elapsed_ticks_left = gopigo.enc_read(gopigo.LEFT)
+        self.elapsed_ticks_right = gopigo.enc_read(gopigo.RIGHT)
         self.alert_distance = None
         self.critical_distance = None
         self.current_acceleration = None
@@ -61,8 +61,8 @@ class ACC:
         self.left_rotation_rate = None                  # Ticks per second
         self.right_rotation_rate = None                 # Ticks per second
         self.minimum_settable_safe_distance = None
-        self.n_ticks_l = None
-        self.n_ticks_r = None
+        self.delta_ticks_l = None
+        self.delta_ticks_r = None
         self.obstacle_distance = None
         self.obstacle_velocity = None
         self.obstacle_acceleration = None
@@ -130,6 +130,7 @@ class ACC:
         self.alert_distance = self.safe_distance + max(self.current_speed_left, self.current_speed_right)*SLOWDOWN_TIME
         self.perform_obstalce_based_acceleratioin_determination(dt)
 
+
     def caculate_current_speed(self):
         self.current_speed_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
         self.current_speed_right = self.right_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
@@ -151,9 +152,12 @@ class ACC:
             self.obstacle_velocity = None
             self.obstacle_acceleration = None
 
+
     def perform_obstalce_based_acceleratioin_determination(self, dt):
+        if self.obstacle_distance > self.critical_distance and self.stop:
+            self.stop = False
+
         if self.obstacle_distance <= self.critical_distance:
-            gopigo.stop()
             self.stop = True
             self.safe_speed = 0
         elif self.obstacle_distance <= self.safe_distance:
@@ -202,37 +206,33 @@ class ACC:
             elif self.elapsed_ticks_right < self.elapsed_ticks_left:
                 self.increase_r_rotation_rate(delta_ticks, dt)
 
-    #TODO: This needs to be looked at further
+
     def calculate_elapsed_ticks(self):
         l_ticks = gopigo.enc_read(gopigo.LEFT)
         r_ticks = gopigo.enc_read(gopigo.RIGHT)
         if l_ticks is not None:
-            old_ticks = self.elapsed_ticks_left
-            self.elapsed_ticks_left = l_ticks - self.elapsed_ticks_left
-            self.n_ticks_l = self.elapsed_ticks_left - old_ticks
+            self.delta_ticks_l = l_ticks - self.elapsed_ticks_left
+            self.elapsed_ticks_left = self.elapsed_ticks_left + self.delta_ticks_l
         else:
-            self.elapsed_ticks_left = self.elapsed_ticks_left
-            self.n_ticks_l = 0
+            self.delta_ticks_l = 0
 
         if r_ticks is not None:
-            old_ticks = self.elapsed_ticks_right
-            self.elapsed_ticks_right = r_ticks - self.elapsed_ticks_right
-            self.n_ticks_r = self.elapsed_ticks_right - old_ticks
+            self.delta_ticks_r = r_ticks - self.elapsed_ticks_right
+            self.elapsed_ticks_right = self.elapsed_ticks_right + self.delta_ticks_r
         else:
-            self.elapsed_ticks_right = self.elapsed_ticks_right
-            self.n_ticks_r = 0
+            self.delta_ticks_r = 0
 
-        if self.elapsed_ticks_left >= MAX_TICK_COUNT or (self.elapsed_ticks_right >= MAX_TICK_COUNT):
-            carry_over_delta = self.elapsed_ticks_left - self.elapsed_ticks_right
-            if carry_over_delta > 0:
-                self.elapsed_ticks_left = carry_over_delta
-                self.elapsed_ticks_right = 0
-            elif carry_over_delta < 0:
-                self.elapsed_ticks_left = 0
-                self.elapsed_ticks_right = -carry_over_delta
-            else:
-                self.elapsed_ticks_left = 0
-                self.elapsed_ticks_right = 0
+        #if self.elapsed_ticks_left >= MAX_TICK_COUNT or (self.elapsed_ticks_right >= MAX_TICK_COUNT):
+        #    carry_over_delta = self.elapsed_ticks_left - self.elapsed_ticks_right
+        #    if carry_over_delta > 0:
+        #        self.elapsed_ticks_left = carry_over_delta
+        #        self.elapsed_ticks_right = 0
+        #    elif carry_over_delta < 0:
+        #        self.elapsed_ticks_left = 0
+        #        self.elapsed_ticks_right = -carry_over_delta
+        #    else:
+        #        self.elapsed_ticks_left = 0
+        #        self.elapsed_ticks_right = 0
 
 
     def increase_l_rotation_rate(self, delta_ticks, dt):
@@ -243,7 +243,6 @@ class ACC:
         self.right_rotation_rate = self.right_rotation_rate + (delta_ticks/dt)
 
 
-    #TODO: This needs to be looked at further
     def velocity_to_power_calculation(self, dt):
         self.v_path_left = self.left_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
         self.v_path_right = self.right_rotation_rate * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
@@ -253,8 +252,8 @@ class ACC:
 
         v_old_l = self.prev_achieved_v_l
         v_old_r = self.prev_achieved_v_r
-        self.prev_achieved_v_l = (self.n_ticks_l/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
-        self.prev_achieved_v_r = (self.n_ticks_r/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+        self.prev_achieved_v_l = (self.delta_ticks_l/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
+        self.prev_achieved_v_r = (self.delta_ticks_r/dt) * ((2.0*math.pi)/TICK_MARKS) * (WHEEL_CIRC/TICK_MARKS)
 
         v_new_l = (self.prev_achieved_v_l - v_old_l)*(self.left_power/v_old_l)*self.v_desired_left
         v_new_r = (self.prev_achieved_v_r - v_old_r)*(self.right_power/v_old_r)*self.v_desired_right
@@ -264,21 +263,18 @@ class ACC:
 
         if self.left_power > MAX_POWER_VALUE:
             self.left_power = MAX_POWER_VALUE
-        elif self.left_power is MAX_POWER_VALUE:
-            self.left_power = MAX_POWER_VALUE
 
         if self.right_power > MAX_POWER_VALUE:
             self.right_power = MAX_POWER_VALUE
-        elif self.right_power is MAX_POWER_VALUE:
-            self.right_power = MAX_POWER_VALUE
 
 
-    #TODO: Don't forget about gopigo.fwd() etc.
     def actualize_power(self):
         if self.stop:
             gopigo.set_left_speed(0)
             gopigo.set_right_speed(0)
         else:
+            if gopigo.enc_read(gopigo.LEFT) == 0 and gopigo.enc_read(gopigo.RIGHT) == 0:
+                gopigo.fwd()
             gopigo.set_left_speed(self.left_power)
             gopigo.set_right_speed(self.right_power)
 

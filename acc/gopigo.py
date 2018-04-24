@@ -1,4 +1,3 @@
-import sys
 import time
 import smbus
 
@@ -55,7 +54,42 @@ def us_dist(pin):
 
 
 def read_motor_speed():
+    write_i2c_block(address,read_motor_speed_cmd+[unused,unused,unused])
+    try:
+        s1=bus.read_byte(address)
+        s2=bus.read_byte(address)
+    except IOError:
+        return [-1,-1]
+    return [s1,s2]
 
-def set_left_speed(power):
 
-def set_right_speed(power):
+def set_left_speed(speed):
+    """
+	Sets the speed of the left motor. The speed should be in the range of
+	[0, 255].
+	Returns -1 if the motor speed change fails.
+	:param int speed: The speed to set the left motor to. [0, 255]
+	:return: A value indicating if the setting suceeded.
+	:rtype: int
+	"""
+    if speed >255:
+        speed =255
+    elif speed <0:
+        speed =0
+    return write_i2c_block(address,set_left_speed_cmd+[speed,0,0])
+
+
+def set_right_speed(speed):
+    """
+	Sets the speed of the right motor. The speed should be in the range of
+	[0, 255].
+	Returns -1 if the motor speed change fails.
+	:param int speed: The speed to set the right motor to. [0, 255]
+	:return: A value indicating if the setting suceeded.
+	:rtype: int
+	"""
+    if speed >255:
+        speed =255
+    elif speed <0:
+        speed =0
+    return write_i2c_block(address,set_right_speed_cmd+[speed,0,0])
