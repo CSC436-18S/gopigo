@@ -11,23 +11,23 @@ from flask_cors import CORS
 import json
 from collections import OrderedDict
 
-from settings import SystemInfo
-
 import multiprocessing
 
 import commands
 
-"""
-  used to grab correct network interface from for the hostname
-  instead of localhost, which allows for mobile device connection
-"""
+
 def get_ip_address(ifname):
+    """
+      used to grab correct network interface from for the hostname
+      instead of localhost, which allows for mobile device connection
+    """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     return socket.inet_ntoa(fcntl.ioctl(
-      s.fileno(),
-      0x8915,
-      struct.pack('256s', ifname[:15])
+        s.fileno(),
+        0x8915,
+        struct.pack('256s', ifname[:15])
     )[20:24])
+
 
 """
   - create application instance of Flask
@@ -48,110 +48,110 @@ COMMAND_QUEUE = None
   if wlp2s0 cannot be found, default to wlan0
 """
 try:
-  HOSTNAME = get_ip_address('wlp2s0')
+    HOSTNAME = get_ip_address('wlp2s0')
 except IOError:
-  HOSTNAME = get_ip_address('wlan0')
+    HOSTNAME = get_ip_address('wlan0')
 
-"""
-  default values for needed variables for application,
-  speed 0 so not moving, distance 9999 because this is
-  technically safeDistance, power False because we don't
-  want to start the rover immediately after the application
-"""
-system_info = SystemInfo(userSetSpeed=0, safeDistance=9999, currentSpeed=0, obstacleDistance=9999, power=True)
 
-"""
-  root path of application that renders the index.html
-  file from the templates folder
-"""
 @app.route('/')
 def index():
+    """
+      root path of application that renders the index.html
+      file from the templates folder
+    """
     return render_template('index.html', hostname=HOSTNAME, port=PORT)
 
-"""
-  function that handles starting the application on port 8080
-"""
-def run(isDebug, command_queue):
-  global COMMAND_QUEUE
-  COMMAND_QUEUE = command_queue
 
-  app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
+def run(isDebug, command_queue, system_info_temp):
+    """
+      function that handles starting the application on port 8080
+    """
+    global COMMAND_QUEUE
+    global system_info
+    COMMAND_QUEUE = command_queue
 
-"""
-  handles getting the user settings
-  by returing the user settings from ordered tuples
-  of the settings so JSON does not serialize and re-order data
-"""
+    system_info = system_info_temp
+
+    app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
+
+
 @app.route('/api/system-info', methods=['GET'])
 def get_settings():
-  state = OrderedDict([
-    ('currentSpeed', system_info.getCurrentSpeed()),
-    ('obstacleDistance', system_info.getObstacleDistance())])
-  settings = OrderedDict([
-    ('userSetSpeed', system_info.getUserSetSpeed()),
-    ('safeDistance', system_info.getSafeDistance())
-  ])
-  res = json.dumps({
-    "state": state,
-    "settings": settings
-  })
-  return res
+    """
+      handles getting the user settings
+      by returing the user settings from ordered tuples
+      of the settings so JSON does not serialize and re-order data
+    """
+    state = OrderedDict([
+        ('currentSpeed', system_info.getCurrentSpeed()),
+        ('obstacleDistance', system_info.getObstacleDistance())])
+    settings = OrderedDict([
+        ('userSetSpeed', system_info.getUserSetSpeed()),
+        ('safeDistance', system_info.getSafeDistance())
+    ])
+    res = json.dumps({
+        "state": state,
+        "settings": settings
+    })
+    return res
 
-"""
-  handles POST request of user settings from fetch,
-  and returns the render_template index.html
-  because we do not need immediate access to the data
-  after the POST request
-"""
+
 @app.route('/api/turn-off', methods=['POST'])
 def turn_off():
-  system_info.setPower(False)
+    """
+      handles POST request of user settings from fetch,
+      and returns the render_template index.html
+      because we do not need immediate access to the data
+      after the POST request
+    """
+    system_info.setPower(False)
 
-  COMMAND_QUEUE.put(commands.TurnOffCommand())
+    COMMAND_QUEUE.put(commands.TurnOffCommand())
 
-  return json.dumps(system_info.__dict__)
+    return json.dumps(system_info.__dict__)
 
 
-"""
-  handles POST request of user settings from fetch,
-  and returns the render_template index.html
-  because we do not need immediate access to the data
-  after the POST request
-"""
 @app.route('/api/user-settings', methods=['POST'])
 def post_settings():
-  dataDict = json.loads(request.data)
-  speed = dataDict['speed']
-  distance = dataDict['distance']
-  system_info.setUserSetSpeed(speed)
-  system_info.setSafeDistance(distance)
+    """
+      handles POST request of user settings from fetch,
+      and returns the render_template index.html
+      because we do not need immediate access to the data
+      after the POST request
+    """
+    dataDict = json.loads(request.data)
+    speed = dataDict['speed']
+    distance = dataDict['distance']
+    system_info.setUserSetSpeed(speed)
+    system_info.setSafeDistance(distance)
 
-  COMMAND_QUEUE.put(commands.ChangeSettingsCommand(speed, distance))
+    COMMAND_QUEUE.put(commands.ChangeSettingsCommand(speed, distance))
 
-  return json.dumps(system_info.__dict__)
+    return json.dumps(system_info.__dict__)
 
 
-"""
-  handles GET request for the power status,
-  by returing the power status jsonified
-"""
 @app.route('/api/power-status', methods=['GET'])
 def get_power():
-  res = jsonify({
-    "power": system_info.getPower()
-  })
-  res.status_code = 200
-  return res
+    """
+      handles GET request for the power status,
+      by returing the power status jsonified
+    """
+    res = jsonify({
+        "power": system_info.getPower()
+    })
+    res.status_code = 200
+    return res
 
-"""
-  handles POST request for setting the power from fetch,
-  since the fetch needs the value of the power status
-  after setting it, we return the power status,
-  and not the render template
-"""
+
 @app.route('/api/power-status', methods=['POST'])
 def post_power():
-  dataDict = json.loads(request.data)
-  global power
-  power = dataDict['power']
-  return jsonify(power)
+    """
+      handles POST request for setting the power from fetch,
+      since the fetch needs the value of the power status
+      after setting it, we return the power status,
+      and not the render template
+    """
+    dataDict = json.loads(request.data)
+    global power
+    power = dataDict['power']
+    return jsonify(power)
