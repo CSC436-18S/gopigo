@@ -12,7 +12,7 @@ from multiprocessing.managers import BaseManager
 import time
 import settings
 
-#import acc
+import acc
 import api
 
 
