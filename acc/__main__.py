@@ -52,7 +52,7 @@ def main():
     listener_process.start()
 
     # for testing purposes
-    listener_process.join()
+    # listener_process.join()
 
     #listen_pid = listener_process.pid
 
