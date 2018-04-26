@@ -11,9 +11,11 @@ from flask_cors import CORS
 import json
 from collections import OrderedDict
 
-import multiprocessing
+from multiprocessing import Pool
 
 import commands
+
+_pool = None
 
 
 def get_ip_address(ifname):
@@ -68,20 +70,21 @@ def run(isDebug, command_queue, system_info_temp):
     """
     global COMMAND_QUEUE
     global system_info
+    global _pool
     COMMAND_QUEUE = command_queue
 
     system_info = system_info_temp
 
-    app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
+    _pool = Pool(processes=4)
+
+    try:
+        app.run(port=PORT, debug=isDebug, threaded=True, host=HOSTNAME)
+    except KeyboardInterrupt:
+        _pool.close()
+        _pool.join()
 
 
-@app.route('/api/system-info', methods=['GET'])
-def get_settings():
-    """
-      handles getting the user settings
-      by returing the user settings from ordered tuples
-      of the settings so JSON does not serialize and re-order data
-    """
+def getJson():
     state = OrderedDict([
         ('currentSpeed', system_info.getCurrentSpeed()),
         ('obstacleDistance', system_info.getObstacleDistance())])
@@ -96,6 +99,26 @@ def get_settings():
     return res
 
 
+@app.route('/api/system-info', methods=['GET'])
+def get_settings():
+    """
+      handles getting the user settings
+      by returing the user settings from ordered tuples
+      of the settings so JSON does not serialize and re-order data
+    """
+    req = _pool.apply_async(getJson)
+    res = req.get()
+    resDict = json.loads(res)
+    settings = resDict['settings']
+    state = resDict['state']
+
+    temp = json.dumps({
+        "state": state,
+        "settings": settings
+    })
+    return temp
+
+
 @app.route('/api/turn-off', methods=['POST'])
 def turn_off():
     """
@@ -104,11 +127,15 @@ def turn_off():
       because we do not need immediate access to the data
       after the POST request
     """
-    system_info.setPower(False)
-
     COMMAND_QUEUE.put(commands.TurnOffCommand())
 
-    return json.dumps(system_info.__dict__)
+    req = _pool.apply_async(getPower)
+    res = req.get()
+    json = jsonify({
+        "power": res
+    })
+    json.status_code = 200
+    return json
 
 
 @app.route('/api/user-settings', methods=['POST'])
@@ -126,8 +153,17 @@ def post_settings():
     system_info.setSafeDistance(distance)
 
     COMMAND_QUEUE.put(commands.ChangeSettingsCommand(speed, distance))
+    req = _pool.apply_async(getJson)
+    res = req.get()
+    resDict = json.loads(res)
+    settings = resDict['settings']
+    return json.dumps({
+        "settings": settings
+    })
 
-    return json.dumps(system_info.__dict__)
+
+def getPower():
+    return system_info.getPower()
 
 
 @app.route('/api/power-status', methods=['GET'])
@@ -136,11 +172,13 @@ def get_power():
       handles GET request for the power status,
       by returing the power status jsonified
     """
-    res = jsonify({
-        "power": system_info.getPower()
+    req = _pool.apply_async(getPower)
+    res = req.get()
+    json = jsonify({
+        "power": res
     })
-    res.status_code = 200
-    return res
+    json.status_code = 200
+    return json
 
 
 @app.route('/api/power-status', methods=['POST'])

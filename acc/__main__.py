@@ -12,7 +12,7 @@ from multiprocessing.managers import BaseManager
 import time
 import settings
 
-import acc
+#import acc
 import api
 
 
@@ -40,8 +40,7 @@ def main():
     technically safeDistance, power False because we don't
     want to start the rover immediately after the application
     """
-    system_info = manager.SystemInfo(  # pylint: disable=no-member
-        userSetSpeed=0, safeDistance=9999, currentSpeed=0, obstacleDistance=9999, power=True)
+    system_info = manager.SystemInfo()  # pylint: disable=no-member
 
     # listener_process = multiprocessing.Process(target=lambda x: print("P"), args=(True,))
     listener_process = multiprocessing.Process(
@@ -51,6 +50,9 @@ def main():
     #listener_process = api.test(command_queue)
 
     listener_process.start()
+
+    # for testing purposes
+    listener_process.join()
 
     #listen_pid = listener_process.pid
 

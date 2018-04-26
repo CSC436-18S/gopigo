@@ -1,10 +1,10 @@
 class SystemInfo():
-    def __init__(self, userSetSpeed, safeDistance, currentSpeed, obstacleDistance, power):
-        self.userSetSpeed = userSetSpeed
-        self.safeDistance = safeDistance
-        self.currentSpeed = currentSpeed
-        self.obstacleDistance = obstacleDistance
-        self.power = power
+    def __init__(self):
+        self.userSetSpeed = 0
+        self.safeDistance = 9999
+        self.currentSpeed = 0
+        self.obstacleDistance = 9999
+        self.power = True
 
     def getPower(self):
         return self.power
