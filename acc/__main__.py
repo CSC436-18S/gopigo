@@ -4,15 +4,13 @@ This module is the main module of the ACC program.
 Running this module will start up the ACC and run the webserver for the user
 interface.
 """
-from __future__ import print_function
-
 import multiprocessing
 from multiprocessing.managers import BaseManager
-import settings
 import sys
 
 import acc
 import api
+import settings
 
 
 class SettingsManager(BaseManager):
@@ -68,7 +66,6 @@ def get_initial_user_settings(argv):
     safe_distance = None
     for a in argv[1:]:
         splitted = a.split("=")
-        print(splitted)
         if splitted[0] == "speed":
             user_set_speed = int(splitted[1])
         elif splitted[0] == "distance":

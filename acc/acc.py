@@ -15,41 +15,43 @@ import commands
 TRIM = 0                # The trim to apply to the motors of the rover (trim units)
 INITIAL_SPEED = 50      # The initial speed to start the rover at (power units)
 MAX_SPEED = 250         # The max speed to allow the rover to go at (power units)
-MIN_SPEED = 30          # The minimum speed to allow the rover to go at. This
-                        # prevents issues caused by mechanical differences
-                        # between the motors that cause problems at very low
-                        # speeds. (power units)
+MIN_SPEED = 30          # The minimum speed to allow the rover to go at. This prevents issues caused by mechanical
+                        # differences between the motors that cause problems at very low speeds. (power units)
 
-INC_CONST = 100.0       # A constant used for calculating the power difference
-                        # to apply to compensate for the rover not moving in a
-                        # straight path.
+INC_CONST = 100.0       # A constant used for calculating the power difference to apply to compensate for the rover not
+                        # moving in a straight path.
 
-CRITICAL_DISTANCE_MIN = 12  # The minimum critical distance to allow. This
-                            # should be sufficient to allow the rover to stop
-                            # at most speeds.
+CRITICAL_DISTANCE_MIN = 12  # The minimum critical distance to allow. This should be sufficient to allow the rover to
+                            # stop at most speeds. (cm)
 
 MODE_SAFE_OLD = True
 MODE_ALERT_OLD = True
 
-DYNAMIC_ALERT_DISTANCE = True
-ALERT_DISTANCE_OFFSET = 40
+BUFFER_DISTANCE = 10            # A distance from the critical distance to use in calculating the minimum settable safe
+                                # distance (cm)
 
-BUFFER_DISTANCE = 10 # cm
-TIMESTEPS_TO_APPROACH_SD = 20
+TIMESTEPS_TO_APPROACH_SD = 20   # A number of runs of the main loop to use in calculating various values relating to
+                                # moving towards the safe distance (timesteps)
 
-SLOWING_DECCELLERATION = 50#100 # power units / second
-SPEED_ACCELERATION = 40#100 # power units / second
+SLOWING_DECELERATION = 50       # A deceleration to apply to the speed in order to slow down (power unit/s^2)
+SPEED_ACCELERATION = 40         # An acceleration to apply to the speed in order to speed up (power unit/s^2)
 
-STOP_THRESHOLD = 0.01
+STOP_THRESHOLD = 0.01       # A value used to prevent odd fluctuations of the speed when between the critical and safe
+                            # distances (power units)
 
-SAMPLE_SIZE = 10#20     # number of uss readings to sample for relative velocity
-ALERT_THRESHOLD = 5.0 # 0.01
+SAMPLE_SIZE = 10            # The number of obstacle distance readings to sample to calculate relative velocity
+ALERT_THRESHOLD = 5.0       # A threshold used to determine whether to adjust speed based on the obstacle's relative
+                            # velocity, when between the safe and alert distances (cm/s)
 
 USS_ERROR = "USS_ERROR"
 NOTHING_FOUND = "NOTHING_FOUND"
 
 
 class ACC(object):
+    """
+    A class used for representing and running the ACC.
+    """
+
     def __init__(self, system_info, command_queue, user_set_speed, safe_distance):
         """
         Initializes the rover object and sets the values based on the given
@@ -62,41 +64,45 @@ class ACC(object):
         :param int safe_distance: The user set safe distance. None will cause a
         reasonable default to be used.
         """
-        self.system_info = system_info
-        self.command_queue = command_queue
+        self.system_info = system_info          # An object that relays ACC, rover, and obstacle information to the user
+                                                # interface
+        self.command_queue = command_queue      # A concurrent queue that will contain commands for the ACC for changing
+                                                # settings and shutting it down
 
+        self.user_set_speed = None              # The speed that the user desires the rover to move at (power units)
         if user_set_speed is None:
             motor_speeds = gopigo.read_motor_speed()
             self.user_set_speed = (motor_speeds[0] + motor_speeds[1]) / 2.0
         else:
             self.user_set_speed = user_set_speed
 
+        self.safe_distance = None               # The distance that the user desires the rover to maintain from the obstacle (cm)
         if safe_distance is None:
             self.safe_distance = 2 * BUFFER_DISTANCE
         else:
             self.safe_distance = safe_distance
 
-        self.initial_ticks_left = 0
-        self.initial_ticks_right = 0
+        self.initial_ticks_left = 0             # The number of left motor ticks when the ACC was started (ticks)
+        self.initial_ticks_right = 0            # The number of right motor ticks when the ACC was started (ticks)
 
-        self.elapsed_ticks_left = 0
-        self.elapsed_ticks_right = 0
+        self.elapsed_ticks_left = 0             # The number of left motor ticks elapsed since the ACC was started (ticks)
+        self.elapsed_ticks_right = 0            # The number of right motor ticks elapsed since the ACC was started (ticks)
 
-        self.speed = INITIAL_SPEED
+        self.speed = INITIAL_SPEED              # The speed that the rover is/should be going at (power units)
 
-        self.power_on = False
+        self.power_on = False                   # A value representing if the ACC is on or not
 
-        self.obstacle_distance = None
-        self.obstacle_relative_speed = None
+        self.obstacle_distance = None           # The distance of the obstacle from the rover (cm)
+        self.obstacle_relative_speed = None     # The velocity of the obstacle relative to the rover (cm/s)
 
-        self.critical_distance = 0
-        self.minimum_settable_safe_distance = 0
-        self.alert_distance = 0
+        self.critical_distance = 0                  # The critical distance of the rover to the obstacle (cm)
+        self.minimum_settable_safe_distance = 0     # The minimum settable safe distance (cm)
+        self.alert_distance = 0                     # The alert distance of the rover to the obstacle (cm)
 
-        self.t = 0
+        self.t = 0                              # A value used for calculating the delta time for the main loop (s)
 
-        self.dists = collections.deque(maxlen=SAMPLE_SIZE)
-        self.dts = collections.deque(maxlen=SAMPLE_SIZE - 1)
+        self.dists = collections.deque(maxlen=SAMPLE_SIZE)      # A log of previous obstacle distance measures (cm)
+        self.dts = collections.deque(maxlen=SAMPLE_SIZE - 1)    # A log of previous delta times for the main loop (s)
 
     def __update_system_info(self):
         """
@@ -262,7 +268,7 @@ class ACC(object):
 
             return new_speed
         elif self.obstacle_relative_speed < -ALERT_THRESHOLD:
-            new_speed = self.speed - dt * SLOWING_DECCELLERATION
+            new_speed = self.speed - dt * SLOWING_DECELERATION
 
             if new_speed < MIN_SPEED:
                 new_speed = MIN_SPEED
@@ -281,13 +287,10 @@ class ACC(object):
         self.critical_distance = CRITICAL_DISTANCE_MIN + 7 * (self.speed / float(MAX_SPEED))
         self.minimum_settable_safe_distance = self.critical_distance + BUFFER_DISTANCE
 
-        if DYNAMIC_ALERT_DISTANCE:
-            if self.obstacle_relative_speed is not None:
-                self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
-            else:
-                self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * self.speed
+        if self.obstacle_relative_speed is not None:
+            self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * abs(self.obstacle_relative_speed)
         else:
-            self.alert_distance = self.safe_distance + ALERT_DISTANCE_OFFSET
+            self.alert_distance = self.safe_distance + TIMESTEPS_TO_APPROACH_SD * dt * self.speed
 
     def __validate_user_settings(self):
         """
@@ -329,7 +332,7 @@ class ACC(object):
                 self.speed = self.speed + (self.__velocity_to_power((self.obstacle_distance - self.safe_distance) / dt))
         elif self.speed > self.user_set_speed:
             self.system_info.setSafetyRange("Slowing")
-            self.speed = self.speed - dt * SLOWING_DECCELLERATION
+            self.speed = self.speed - dt * SLOWING_DECELERATION
         elif self.obstacle_distance <= self.alert_distance and \
             self.obstacle_relative_speed is not None:
             self.system_info.setSafetyRange("Alert")
@@ -360,9 +363,8 @@ class ACC(object):
         self.elapsed_ticks_left, self.elapsed_ticks_right = \
             read_enc_ticks(self.initial_ticks_left, self.initial_ticks_right)
 
-        # Handle invalid encoder readings
         if self.elapsed_ticks_left < 0 or self.elapsed_ticks_right < 0:
-            return 0, 0
+            return 0, 0     # Handle invalid encoder readings
         if self.elapsed_ticks_left > self.elapsed_ticks_right:
             return -get_inc(self.speed), get_inc(self.speed)
         elif self.elapsed_ticks_left < self.elapsed_ticks_right:
@@ -373,6 +375,10 @@ class ACC(object):
     def __actualize_power(self, l_diff, r_diff):
         """
         Applies the decided motor powers to the motors of the rover.
+
+        If the desired motor power is below the minimum allowed motor power,
+        then the motors are stopped to prevent issues with motor differences at
+        low motor powers.
 
         :param l_diff: The additional motor power to apply to just the left
         motor. (power units)
@@ -390,7 +396,7 @@ class ACC(object):
         """
         Returns the deceleration amount to use when slowing down when within the
         safe distance.
-    
+
         It is based on the current speed so that at higher speeds it decelerates
         more, and at lower speeds it decelerates less.
 
@@ -422,9 +428,7 @@ class ACC(object):
 
                 self.__observe_obstacle(dt)
                 self.__calculate_relevant_distances(dt)
-
                 self.__validate_user_settings()
-
                 self.__obstacle_based_acceleration_determination(dt)
 
                 # Reset the speed if it becomes negative

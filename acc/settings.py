@@ -1,6 +1,13 @@
-UNKNOWN = "-"
+"""
+This module contains a class for sharing information on the state of the ACC,
+rover, and obstacle between the main process for the ACC and the listener
+process. It allows for this information to be relayed to the user.
+"""
+UNKNOWN = "-"   # An initial value given to all of the values, so that the user interface has something to show that the
+                # given value is currently unknown
 
-class SystemInfo():
+
+class SystemInfo(object):
     def __init__(self):
         self.currentSpeed = UNKNOWN
         self.obstacleDistance = UNKNOWN

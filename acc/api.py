@@ -2,16 +2,16 @@
 This is the module of the program that contains all of the functions related to
 the webserver that hosts the user interface for the ACC.
 """
-import struct
-import socket
 import fcntl
-from flask import Flask, render_template, request, render_template, jsonify
-from flask_restful import Api, Resource
-from flask_cors import CORS
 import json
+import socket
+import struct
 from collections import OrderedDict
-
 from multiprocessing import Pool
+
+from flask import Flask, request, render_template, jsonify
+from flask_cors import CORS
+from flask_restful import Api
 
 import commands
 
@@ -84,7 +84,7 @@ def run(isDebug, command_queue, system_info_temp):
         _pool.join()
 
 
-def getJson():
+def get_json():
     state = OrderedDict([
         ('currentSpeed', system_info.getCurrentSpeed()),
         ('obstacleDistance', system_info.getObstacleDistance()),
@@ -113,11 +113,11 @@ def get_settings():
       by returing the user settings from ordered tuples
       of the settings so JSON does not serialize and re-order data
     """
-    req = _pool.apply_async(getJson)
+    req = _pool.apply_async(get_json)
     res = req.get()
-    resDict = json.loads(res)
-    settings = resDict['settings']
-    state = resDict['state']
+    res_dict = json.loads(res)
+    settings = res_dict['settings']
+    state = res_dict['state']
 
     temp = json.dumps({
         "state": state,
@@ -152,17 +152,17 @@ def post_settings():
       because we do not need immediate access to the data
       after the POST request
     """
-    dataDict = json.loads(request.data)
-    speed = dataDict['speed']
-    distance = dataDict['distance']
+    data_dict = json.loads(request.data)
+    speed = data_dict['speed']
+    distance = data_dict['distance']
     system_info.setUserSetSpeed(speed)
     system_info.setSafeDistance(distance)
 
     COMMAND_QUEUE.put(commands.ChangeSettingsCommand(speed, distance))
-    req = _pool.apply_async(getJson)
+    req = _pool.apply_async(get_json)
     res = req.get()
-    resDict = json.loads(res)
-    settings = resDict['settings']
+    res_dict = json.loads(res)
+    settings = res_dict['settings']
     return json.dumps({
         "settings": settings
     })

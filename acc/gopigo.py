@@ -1,20 +1,20 @@
-###############################################
-# These functions have been modified from the gopigo library (GPLv3) in order
-# to remove some of the extra time.sleep times, so that the main loop can run
-# at a faster rate.
-#
-# For the ACC, the running rate of the main loop can greatly impact the
-# performance as slower rates lead to slower response times.
-###############################################
+"""
+These functions have been modified from the gopigo library (GPLv3) in order
+to remove some of the extra time.sleep times, so that the main loop can run
+at a faster rate.
+
+For the ACC, the running rate of the main loop can greatly impact the
+performance as slower rates lead to slower response times.
+"""
 
 import time
 import smbus
 
 
-LEFT = 0                    #Used to denote the Left Motor
-RIGHT = 1                   #Used to denote the Right Motor
+LEFT = 0                    # Used to denote the Left Motor
+RIGHT = 1                   # Used to denote the Right Motor
 
-USS = 15                    #Pin used to access the Ultrasonic Sensor
+USS = 15                    # Pin used to access the Ultrasonic Sensor
 
 ADDRESS = 0x08
 
@@ -28,7 +28,6 @@ set_left_speed_cmd = [70]
 set_right_speed_cmd = [71]
 motor_fwd_cmd = [105]
 trim_write_cmd = [31]
-ENC_READ_CMD = [53]
 volt_cmd = [118]
 stop_cmd = [120]
 read_motor_speed_cmd = [114]
@@ -37,7 +36,7 @@ unused = 0
 
 def write_i2c_block(address, block):
     try:
-        op = bus.write_i2c_block_data(ADDRESS, 1, block)
+        op = bus.write_i2c_block_data(address, 1, block)
         time.sleep(0.005)
         return op
     except IOError:
